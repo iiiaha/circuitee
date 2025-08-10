@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Circuitee - 조명 회로 설계 시뮬레이터</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- 헤더 -->
+    <header>
+        <h1>Circuitee</h1>
+        <div class="controls">
+            <button id="modeToggle" class="btn">편집 모드</button>
+            <button id="shareBtn" class="btn btn-primary">공유하기</button>
+        </div>
+    </header>
+
+    <!-- 메인 컨테이너 -->
+    <div class="main-container">
+        <!-- 사이드바 (편집 모드용) -->
+        <aside id="sidebar" class="sidebar">
+            <h3>도구</h3>
+            
+            <div class="tool-section">
+                <h4>평면도</h4>
+                <div id="uploadArea" class="upload-area">
+                    <p>이미지를 드래그하거나<br>클릭하여 업로드</p>
+                    <input type="file" id="fileInput" accept="image/*" hidden>
+                </div>
+            </div>
+            
+            <div class="tool-section">
+                <h4>요소 추가</h4>
+                <button class="tool-btn" data-tool="switch">
+                    <span class="icon">🎚️</span> 스위치
+                </button>
+                <button class="tool-btn" data-tool="light">
+                    <span class="icon">💡</span> 조명
+                </button>
+            </div>
+            
+            <div class="tool-section">
+                <h4>연결 모드</h4>
+                <button id="connectBtn" class="tool-btn">
+                    <span class="icon">🔗</span> 연결하기
+                </button>
+            </div>
+            
+            <div class="tool-section">
+                <button id="clearBtn" class="btn btn-danger">모든 요소 지우기</button>
+            </div>
+        </aside>
+
+        <!-- 캔버스 영역 -->
+        <main class="canvas-container">
+            <div id="canvas" class="canvas">
+                <div id="floorPlanLayer" class="layer floor-plan-layer">
+                    <!-- 평면도 이미지가 여기에 표시됨 -->
+                </div>
+                <div id="connectionLayer" class="layer connection-layer">
+                    <!-- 연결선이 여기에 그려짐 -->
+                </div>
+                <div id="elementLayer" class="layer element-layer">
+                    <!-- 스위치와 조명 요소들이 여기에 추가됨 -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 공유 모달 -->
+    <div id="shareModal" class="modal" hidden>
+        <div class="modal-content">
+            <h3>프로젝트 공유</h3>
+            <p>아래 링크를 복사하여 고객에게 전달하세요:</p>
+            <div class="url-container">
+                <input type="text" id="shareUrl" readonly>
+                <button id="copyBtn" class="btn">복사</button>
+            </div>
+            <button id="closeModal" class="btn">닫기</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
