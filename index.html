@@ -8,11 +8,28 @@
 </head>
 <body>
     <!-- 헤더 -->
-    <header>
-        <h1>Circuitee</h1>
-        <div class="controls">
-            <button id="modeToggle" class="btn">편집 모드</button>
-            <button id="shareBtn" class="btn btn-primary">공유하기</button>
+    <header class="header-modern">
+        <div class="header-logo">
+            <img src="logoname.jpg" alt="Circuitee" class="logo-name-img">
+        </div>
+        <div class="header-controls">
+            <button id="modeToggle" class="header-btn header-btn-test">
+                <svg class="header-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+                <span id="modeText">회로 테스트</span>
+            </button>
+            <button id="shareBtn" class="header-btn header-btn-primary">
+                <svg class="header-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="18" cy="5" r="3"/>
+                    <circle cx="6" cy="12" r="3"/>
+                    <circle cx="18" cy="19" r="3"/>
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                </svg>
+                <span>공유하기</span>
+            </button>
         </div>
     </header>
 
@@ -82,6 +99,25 @@
                         </svg>
                         <span>연결 모드</span>
                     </button>
+                </div>
+                
+                <!-- 액션 섹션 -->
+                <div class="tool-group">
+                    <div class="tool-group-label">편집</div>
+                    <div class="undo-redo-container">
+                        <button id="undoBtn" class="undo-redo-btn" disabled>
+                            <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 7v6h6"/>
+                                <path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/>
+                            </svg>
+                        </button>
+                        <button id="redoBtn" class="undo-redo-btn" disabled>
+                            <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 7v6h-6"/>
+                                <path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
                 
                 <!-- 액션 섹션 -->

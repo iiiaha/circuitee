@@ -11,8 +11,14 @@ let state = {
     connectingFrom: null,
     elementIdCounter: 1,
     dragListeners: new Map(), // 메모리 누수 방지를 위한 리스너 관리
-    linearLightStart: null // 직선 조명 첫 번째 클릭 지점
+    linearLightStart: null, // 직선 조명 첫 번째 클릭 지점
+    circuitColors: {} // 회로별 색상 저장 {circuitId: color}
 };
+
+// Undo/Redo 스택
+let undoStack = [];
+let redoStack = [];
+const MAX_UNDO_STACK_SIZE = 50;
 
 // DOM 요소들
 const dom = {
@@ -58,6 +64,8 @@ function initDOM() {
     dom.closeModal = document.getElementById('closeModal');
     dom.clearBtn = document.getElementById('clearBtn');
     dom.connectBtn = document.getElementById('connectBtn');
+    dom.undoBtn = document.getElementById('undoBtn');
+    dom.redoBtn = document.getElementById('redoBtn');
 }
 
 // 이벤트 리스너 설정
@@ -113,6 +121,21 @@ function setupEventListeners() {
             clearAll();
         }
     });
+    
+    // Undo/Redo
+    dom.undoBtn.addEventListener('click', undo);
+    dom.redoBtn.addEventListener('click', redo);
+    
+    // 키보드 단축키
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+            e.preventDefault();
+            undo();
+        } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+            e.preventDefault();
+            redo();
+        }
+    });
 }
 
 // 파일 업로드 처리
@@ -159,6 +182,7 @@ function processImageFile(file) {
             // JPEG로 압축 (품질 0.8)
             state.floorPlan = canvas.toDataURL('image/jpeg', 0.8);
             displayFloorPlan();
+            saveState('평면도 업로드');
             saveToURL();
         };
         img.src = e.target.result;
@@ -242,9 +266,11 @@ function handleCanvasClick(e) {
         state.selectedElement = null;
     }
     
-    const rect = dom.elementLayer.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const rect = dom.canvas.getBoundingClientRect();
+    const scrollLeft = dom.canvas.scrollLeft;
+    const scrollTop = dom.canvas.scrollTop;
+    const x = e.clientX - rect.left + scrollLeft;
+    const y = e.clientY - rect.top + scrollTop;
     
     if (state.selectedTool === 'switch' || state.selectedTool === 'light') {
         addElement(state.selectedTool, x, y);
@@ -289,6 +315,7 @@ function handleLinearLightClick(x, y) {
 
 // 직선 조명 추가
 function addLinearLight(x1, y1, x2, y2) {
+    saveState('직선 조명 추가');
     // 기존 조명 번호들 확인
     const existingNumbers = state.elements
         .filter(el => el.type === 'light' || el.type === 'linear-light')
@@ -332,8 +359,99 @@ function addLinearLight(x1, y1, x2, y2) {
     saveToURL();
 }
 
+// 상태 저장 (Undo 스택에)
+function saveState(description) {
+    const stateSnapshot = {
+        description: description,
+        elements: JSON.parse(JSON.stringify(state.elements)),
+        connections: JSON.parse(JSON.stringify(state.connections)),
+        circuits: JSON.parse(JSON.stringify(state.circuits)),
+        circuitCounter: state.circuitCounter,
+        elementIdCounter: state.elementIdCounter,
+        circuitColors: JSON.parse(JSON.stringify(state.circuitColors))
+    };
+    
+    undoStack.push(stateSnapshot);
+    
+    // 스택 크기 제한
+    if (undoStack.length > MAX_UNDO_STACK_SIZE) {
+        undoStack.shift();
+    }
+    
+    // Redo 스택 초기화
+    redoStack = [];
+    
+    updateUndoRedoButtons();
+}
+
+// Undo 기능
+function undo() {
+    if (undoStack.length === 0) return;
+    
+    // 현재 상태를 redo 스택에 저장
+    const currentState = {
+        description: 'Current state',
+        elements: JSON.parse(JSON.stringify(state.elements)),
+        connections: JSON.parse(JSON.stringify(state.connections)),
+        circuits: JSON.parse(JSON.stringify(state.circuits)),
+        circuitCounter: state.circuitCounter,
+        elementIdCounter: state.elementIdCounter,
+        circuitColors: JSON.parse(JSON.stringify(state.circuitColors))
+    };
+    redoStack.push(currentState);
+    
+    // 이전 상태 복원
+    const previousState = undoStack.pop();
+    restoreState(previousState);
+    
+    updateUndoRedoButtons();
+}
+
+// Redo 기능
+function redo() {
+    if (redoStack.length === 0) return;
+    
+    // 현재 상태를 undo 스택에 저장
+    const currentState = {
+        description: 'Current state',
+        elements: JSON.parse(JSON.stringify(state.elements)),
+        connections: JSON.parse(JSON.stringify(state.connections)),
+        circuits: JSON.parse(JSON.stringify(state.circuits)),
+        circuitCounter: state.circuitCounter,
+        elementIdCounter: state.elementIdCounter,
+        circuitColors: JSON.parse(JSON.stringify(state.circuitColors))
+    };
+    undoStack.push(currentState);
+    
+    // 다음 상태 복원
+    const nextState = redoStack.pop();
+    restoreState(nextState);
+    
+    updateUndoRedoButtons();
+}
+
+// 상태 복원
+function restoreState(snapshot) {
+    state.elements = JSON.parse(JSON.stringify(snapshot.elements));
+    state.connections = JSON.parse(JSON.stringify(snapshot.connections));
+    state.circuits = JSON.parse(JSON.stringify(snapshot.circuits));
+    state.circuitCounter = snapshot.circuitCounter;
+    state.elementIdCounter = snapshot.elementIdCounter;
+    state.circuitColors = JSON.parse(JSON.stringify(snapshot.circuitColors));
+    
+    renderAll();
+    saveToURL();
+}
+
+// Undo/Redo 버튼 상태 업데이트
+function updateUndoRedoButtons() {
+    dom.undoBtn.disabled = undoStack.length === 0;
+    dom.redoBtn.disabled = redoStack.length === 0;
+}
+
 // 요소 추가
 function addElement(type, x, y) {
+    saveState(`${type} 추가`);
     let label;
     
     if (type === 'switch') {
@@ -439,6 +557,12 @@ function setupElementInteractions(elementDiv, elementData) {
 function handleElementClick(e, elementData) {
     e.stopPropagation();
     
+    // 드래그가 막 끝났으면 선택하지 않음
+    if (elementData._justFinishedDragging) {
+        elementData._justFinishedDragging = false;
+        return;
+    }
+    
     if (state.selectedTool === 'connect') {
         handleConnectionClick(elementData);
         return;
@@ -450,6 +574,7 @@ function handleElementClick(e, elementData) {
 
 // 요소 삭제
 function deleteElement(elementId) {
+    saveState('요소 삭제');
     const element = state.elements.find(el => el.id === elementId);
     if (!element) return;
     
@@ -487,6 +612,31 @@ function deleteElement(elementId) {
     // 연결선 다시 그리기
     redrawConnections();
     saveToURL();
+}
+
+// 연결선용 색상 생성 (채도 80%, 명도 40%)
+function generateFluorescentColor() {
+    const fluorescents = [
+        'hsl(120, 80%, 40%)', // 초록
+        'hsl(300, 80%, 40%)', // 보라
+        'hsl(180, 80%, 40%)', // 청록
+        'hsl(60, 80%, 40%)',  // 노랑
+        'hsl(30, 80%, 40%)',  // 주황
+        'hsl(200, 80%, 40%)', // 하늘
+        'hsl(340, 80%, 40%)', // 핑크
+        'hsl(150, 80%, 40%)', // 민트
+    ];
+    
+    // 랜덤하게 미리 정의된 색상 선택
+    return fluorescents[Math.floor(Math.random() * fluorescents.length)];
+}
+
+// 회로 색상 가져오기 (없으면 생성)
+function getCircuitColor(circuitId) {
+    if (!state.circuitColors[circuitId]) {
+        state.circuitColors[circuitId] = generateFluorescentColor();
+    }
+    return state.circuitColors[circuitId];
 }
 
 // 스위치의 구수 계산
@@ -631,6 +781,7 @@ function handleConnectionClick(elementData) {
 
 // 조명-조명 연결 (회로)
 function connectLights(light1, light2) {
+    saveState('조명 연결');
     // 이미 연결되어 있는지 확인
     const existingConnection = state.connections.find(
         conn => (conn.from === light1.id && conn.to === light2.id) ||
@@ -709,6 +860,7 @@ function connectLights(light1, light2) {
 
 // 조명-스위치 연결 (제어)
 function connectLightToSwitch(element1, element2) {
+    saveState('스위치 연결');
     const isLight = (el) => el.type === 'light' || el.type === 'linear-light';
     const light = isLight(element1) ? element1 : element2;
     const switchEl = element1.type === 'switch' ? element1 : element2;
@@ -867,6 +1019,27 @@ function drawConnection(fromId, toId) {
     line.className = 'connection-line';
     if (connection && connection.type) {
         line.classList.add(connection.type);
+        
+        // 연결된 요소들 찾기
+        const fromElement = state.elements.find(el => el.id === fromId);
+        const toElement = state.elements.find(el => el.id === toId);
+        
+        // 회로 연결인 경우 회로 색상 적용
+        if (connection.type === 'circuit') {
+            if (fromElement && fromElement.circuit) {
+                const circuitColor = getCircuitColor(fromElement.circuit);
+                line.style.background = circuitColor;
+            }
+        }
+        // 제어 연결인 경우도 조명의 회로 색상 적용
+        else if (connection.type === 'control') {
+            // 조명 찾기 (fromElement나 toElement 중 조명인 것)
+            const light = (fromElement.type === 'light' || fromElement.type === 'linear-light') ? fromElement : toElement;
+            if (light && light.circuit) {
+                const circuitColor = getCircuitColor(light.circuit);
+                line.style.background = circuitColor;
+            }
+        }
     }
     line.style.left = x1 + 'px';
     line.style.top = y1 + 'px';
@@ -893,14 +1066,22 @@ function redrawConnections() {
 function setupDragging(element, elementData) {
     let isDragging = false;
     let startX, startY;
+    let hasMoved = false;
+    let initialX, initialY;
     
     const handleMouseDown = (e) => {
         if (state.selectedTool === 'connect') return;
         if (e.target.classList.contains('delete-button')) return;
         
         isDragging = true;
-        startX = e.clientX - elementData.x;
-        startY = e.clientY - elementData.y;
+        const rect = dom.canvas.getBoundingClientRect();
+        const scrollLeft = dom.canvas.scrollLeft;
+        const scrollTop = dom.canvas.scrollTop;
+        startX = e.clientX - rect.left + scrollLeft - elementData.x;
+        startY = e.clientY - rect.top + scrollTop - elementData.y;
+        initialX = elementData.x;
+        initialY = elementData.y;
+        hasMoved = false;
         
         element.style.cursor = 'grabbing';
         element.style.zIndex = '100';
@@ -910,13 +1091,24 @@ function setupDragging(element, elementData) {
     const handleMouseMove = (e) => {
         if (!isDragging) return;
         
-        const rect = dom.elementLayer.getBoundingClientRect();
-        let newX = e.clientX - startX;
-        let newY = e.clientY - startY;
+        const rect = dom.canvas.getBoundingClientRect();
+        const scrollLeft = dom.canvas.scrollLeft;
+        const scrollTop = dom.canvas.scrollTop;
+        let newX = e.clientX - rect.left + scrollLeft - startX;
+        let newY = e.clientY - rect.top + scrollTop - startY;
         
-        // 경계 제한
-        newX = Math.max(0, Math.min(newX, rect.width - element.offsetWidth));
-        newY = Math.max(0, Math.min(newY, rect.height - element.offsetHeight));
+        // 경계 제한은 나중에 처리
+        
+        // 실제로 움직였는지 확인
+        if (Math.abs(newX - initialX) > 2 || Math.abs(newY - initialY) > 2) {
+            hasMoved = true;
+        }
+        
+        // 캔버스 크기 체크
+        const canvasWidth = 1600;
+        const canvasHeight = 900;
+        newX = Math.max(0, Math.min(newX, canvasWidth - element.offsetWidth));
+        newY = Math.max(0, Math.min(newY, canvasHeight - element.offsetHeight));
         
         // 직선 조명의 경우 끝점도 같이 이동
         if (elementData.type === 'linear-light') {
@@ -941,6 +1133,13 @@ function setupDragging(element, elementData) {
         isDragging = false;
         element.style.cursor = 'move';
         element.style.zIndex = '';
+        
+        // 실제로 움직였을 때만 플래그 설정
+        if (hasMoved) {
+            elementData._justFinishedDragging = true;
+            saveState('요소 이동');
+        }
+        
         saveToURL();
     };
     
@@ -983,11 +1182,23 @@ function handleSwitchClick(e, switchData) {
     toggleContainer.className = 'circuit-toggles';
     toggleContainer.dataset.switchId = switchData.id;
     
+    // 스위치의 위치 가져오기
+    const rect = switchEl.getBoundingClientRect();
+    const canvasRect = dom.canvas.getBoundingClientRect();
+    
+    // 토글 컨테이너 위치 설정
+    toggleContainer.style.position = 'fixed';
+    toggleContainer.style.left = (rect.right + 5) + 'px';
+    toggleContainer.style.top = (rect.top + rect.height / 2) + 'px';
+    toggleContainer.style.transform = 'translateY(-50%)';
+    
     // 각 회로별로 토글 버튼 생성
     circuits.forEach(circuitId => {
         const toggleBtn = document.createElement('div');
         toggleBtn.className = 'circuit-toggle';
         toggleBtn.dataset.circuit = circuitId;
+        // 회로 번호만 추출 (c1 -> 1)
+        toggleBtn.dataset.circuitNum = circuitId.replace('c', '');
         
         // 현재 회로의 조명 상태 확인
         const circuitLights = state.elements.filter(el => 
@@ -1011,7 +1222,7 @@ function handleSwitchClick(e, switchData) {
         toggleContainer.appendChild(toggleBtn);
     });
     
-    switchEl.appendChild(toggleContainer);
+    document.body.appendChild(toggleContainer);
 }
 
 // 회로별 토글 처리
@@ -1040,7 +1251,10 @@ function handleCircuitToggle(switchId, circuitId, toggleBtn) {
 // 모드 전환
 function toggleMode() {
     state.mode = state.mode === 'edit' ? 'test' : 'edit';
-    dom.modeToggle.textContent = state.mode === 'edit' ? '편집 모드' : '테스트 모드';
+    const modeText = document.getElementById('modeText');
+    if (modeText) {
+        modeText.textContent = state.mode === 'edit' ? '회로 테스트' : '편집 모드';
+    }
     document.body.classList.toggle('test-mode', state.mode === 'test');
     
     // 회로 토글 버튼 제거
@@ -1120,6 +1334,8 @@ function loadFromURL() {
                 const urlParams = new URLSearchParams(window.location.search);
                 if (urlParams.get('mode') === 'test') {
                     state.mode = 'test';
+                    // 테스트 모드 전용 UI 설정
+                    state.isSharedView = true;
                 }
                 
                 renderAll();
@@ -1134,8 +1350,19 @@ function loadFromURL() {
 
 // UI 업데이트
 function updateUI() {
-    dom.modeToggle.textContent = state.mode === 'edit' ? '편집 모드' : '테스트 모드';
+    const modeText = document.getElementById('modeText');
+    if (modeText) {
+        modeText.textContent = state.mode === 'edit' ? '회로 테스트' : '편집 모드';
+    }
     document.body.classList.toggle('test-mode', state.mode === 'test');
+    
+    // 공유된 테스트 모드인 경우 헤더 버튼 숨기기
+    if (state.isSharedView) {
+        document.body.classList.add('shared-view');
+        if (dom.modeToggle) dom.modeToggle.style.display = 'none';
+        if (dom.shareBtn) dom.shareBtn.style.display = 'none';
+    }
+    
     selectTool(null);
 }
 
@@ -1174,11 +1401,18 @@ function clearAll() {
         selectedElement: null,
         connectingFrom: null,
         elementIdCounter: 1,
-        dragListeners: state.dragListeners
+        dragListeners: state.dragListeners,
+        linearLightStart: null,
+        circuitColors: {}
     };
     
     // localStorage에서도 평면도 제거
     localStorage.removeItem('circuitee-floorplan');
+    
+    // Undo/Redo 스택 초기화
+    undoStack = [];
+    redoStack = [];
+    updateUndoRedoButtons();
     
     renderAll();
     saveToURL();

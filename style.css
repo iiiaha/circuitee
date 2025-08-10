@@ -13,28 +13,90 @@ body {
     overflow: hidden;
 }
 
-/* 헤더 */
-header {
+/* 모던 헤더 */
+.header-modern {
     background: white;
-    border-bottom: 1px solid #ddd;
-    padding: 1rem 2rem;
+    border-bottom: 1px solid #e9ecef;
+    padding: 0.75rem 1.5rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     z-index: 100;
 }
 
-h1 {
-    font-size: 1.5rem;
-    color: #333;
-}
-
-.controls {
+.header-logo {
     display: flex;
-    gap: 1rem;
+    align-items: center;
+    gap: 0.75rem;
 }
 
+.logo-name-img {
+    height: 32px;
+    object-fit: contain;
+}
+
+.header-controls {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.header-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    background: white;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #495057;
+    transition: all 0.2s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.header-btn:hover {
+    background: #f8f9fa;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.header-btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.header-btn-primary:hover {
+    background: #0056b3;
+}
+
+.header-btn-primary .header-btn-icon {
+    color: white;
+}
+
+.header-btn-test {
+    background: #007bff;
+    color: white;
+}
+
+.header-btn-test:hover {
+    background: #0056b3;
+}
+
+.header-btn-test .header-btn-icon {
+    color: white;
+}
+
+.header-btn-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    color: #6c757d;
+}
+
+/* 기존 btn 클래스는 모달에서 사용하므로 유지 */
 .btn {
     padding: 0.5rem 1rem;
     border: 1px solid #ddd;
@@ -212,6 +274,7 @@ h1 {
     width: 100%;
     height: 100%;
     overflow: auto;
+    background: white;
 }
 
 /* 레이어 시스템 */
@@ -219,21 +282,22 @@ h1 {
     position: absolute;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
+    width: 1600px;  /* 고정 크기 */
+    height: 900px; /* 고정 크기 */
 }
 
 .floor-plan-layer {
     z-index: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     pointer-events: none;
 }
 
 .floor-plan-layer img {
-    max-width: 90%;
-    max-height: 90%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 1400px;
+    max-height: 800px;
     display: block;
     pointer-events: none;
     user-select: none;
@@ -255,37 +319,53 @@ h1 {
     user-select: none;
 }
 
-.element:hover:not(.linear-light):not(.switch) {
-    transform: scale(1.05);
-}
 
 .element.switch {
     width: 32px;
     height: 16px;
-    background: #333;
+    background: #2c2c2c;
     border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
+    color: #ffffff;
     font-size: 0.6rem;
-    border: 1px solid #222;
+    font-weight: 600;
+    border: 1px solid #3d3d3d;
     z-index: 10;
+    position: relative;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .element.switch.active {
-    background: #4CAF50;
-    border-color: #45a049;
+    background: #5c7cfa;
+    border-color: #5c7cfa;
+    color: white;
+    box-shadow: 0 0 0 2px rgba(92, 124, 250, 0.3);
 }
 
 .element.light {
     width: 8px;
     height: 8px;
-    background: #ffd700;
+    background: #fcfe22;
     border-radius: 50%;
-    border: 1px solid #000;
+    border: 1px solid #8c8c8c;
     z-index: 10;
-    transition: box-shadow 0.3s ease, border-color 0.3s ease, background 0.3s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.4s ease;
+}
+
+.element.light::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    z-index: -1;
 }
 
 .element.light.on {
@@ -294,18 +374,21 @@ h1 {
     box-shadow: 
         0 0 10px 5px rgba(255, 235, 59, 0.6),
         0 0 20px 10px rgba(255, 235, 59, 0.4),
-        0 0 30px 15px rgba(255, 235, 59, 0.2);
+        0 0 30px 15px rgba(255, 235, 59, 0.2),
+        0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .element.linear-light {
     position: absolute;
-    height: 3px;
-    background: #ffd700;
-    border: 1px solid #000;
+    height: 5px;
+    background: #fcfe22;
+    border: 1px solid #8c8c8c;
     z-index: 10;
-    transition: box-shadow 0.3s ease, background 0.3s ease;
     transform-origin: left center;
     cursor: move;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    border-radius: 2.5px;
+    transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.4s ease;
 }
 
 .element.linear-light.on {
@@ -373,7 +456,7 @@ h1 {
         0 0 0 0.5px rgba(0, 0, 0, 0.05),
         0 2px 4px rgba(0, 0, 0, 0.08),
         0 4px 12px rgba(0, 0, 0, 0.08);
-    z-index: 100;
+    z-index: 9999;
     min-width: 80px;
     font-size: 0.65rem;
     overflow: hidden;
@@ -445,19 +528,11 @@ h1 {
     background: #d32f2f;
 }
 
-.element.connecting:not(.linear-light) {
-    animation: pulse 1s infinite;
+.element.connecting {
+    outline: 3px solid #9b59b6;
+    outline-offset: 3px;
 }
 
-.element.linear-light.connecting {
-    animation: linear-pulse 1s infinite;
-}
-
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.1); }
-    100% { transform: scale(1); }
-}
 
 @keyframes linear-pulse {
     0% { opacity: 1; }
@@ -475,13 +550,13 @@ h1 {
 }
 
 .connection-line.circuit {
-    background: rgba(76, 175, 80, 0.6);
     height: 3px;
+    opacity: 0.6;
 }
 
 .connection-line.control {
-    background: rgba(33, 150, 243, 0.6);
     height: 3px;
+    opacity: 0.6;
 }
 
 /* 모달 */
@@ -540,6 +615,26 @@ body.test-mode .sidebar {
     display: none;
 }
 
+body.test-mode .canvas-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f5f5f5;
+    overflow-x: auto;
+    overflow-y: auto;
+    width: 100%;
+    height: 100%;
+}
+
+body.test-mode .canvas {
+    width: 1600px;
+    height: 900px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    flex-shrink: 0;
+    margin: 20px;
+}
+
 body.test-mode .element {
     cursor: default;
 }
@@ -549,51 +644,125 @@ body.test-mode .element.switch {
 }
 
 body.test-mode .element.switch:hover {
-    /* 호버 효과 제거 */
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
 }
 
 /* 회로별 토글 버튼 컨테이너 */
 .circuit-toggles {
-    position: absolute;
-    left: calc(100% + 5px);
-    top: 50%;
-    transform: translateY(-50%);
     display: flex;
     gap: 2px;
     z-index: 100;
+    overflow: visible;
 }
 
 .circuit-toggle {
-    width: 10px;
-    height: 20px;
-    background: #333;
-    border: 1px solid #222;
-    border-radius: 2px;
+    width: 12px;
+    height: 24px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
     cursor: pointer;
     font-size: 0;
     position: relative;
-    transition: background 0.2s;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .circuit-toggle:hover {
-    background: #555;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
 }
 
 .circuit-toggle.active {
-    background: #999;
-    border-color: #888;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.circuit-toggle::before {
+    content: '';
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 8px;
+    height: 8px;
+    background: #6c757d;
+    border-radius: 50%;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.circuit-toggle.active::before {
+    bottom: 13px;
+    background: #28a745;
+    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3);
 }
 
 .circuit-toggle::after {
-    content: attr(data-circuit);
+    content: attr(data-circuit-num);
     position: absolute;
-    bottom: -15px;
+    bottom: -16px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 8px;
-    color: #666;
+    font-size: 10px;
+    font-weight: 600;
+    color: #495057;
     white-space: nowrap;
+    text-align: center;
 }
 
-/* Canvas background for testing transparency */
-.canvas { background-image: linear-gradient(45deg, #eee 25%, transparent 25%), linear-gradient(-45deg, #eee 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #eee 75%), linear-gradient(-45deg, transparent 75%, #eee 75%); background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0px; }
+/* Undo/Redo 버튼 컨테이너 */
+.undo-redo-container {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.undo-redo-btn {
+    flex: 1;
+    padding: 0.5rem;
+    border: none;
+    background: white;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #495057;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.undo-redo-btn:hover:not(:disabled) {
+    background: #f8f9fa;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.undo-redo-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.undo-redo-btn .tool-icon {
+    width: 20px;
+    height: 20px;
+}
+
+/* 캔버스 중앙 시작 위치 설정 */
+.canvas {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 공유된 테스트 모드 스타일 */
+body.shared-view .header-logo::after {
+    content: " - 테스트 모드";
+    font-size: 0.875rem;
+    color: #6c757d;
+    font-weight: normal;
+    margin-left: 0.5rem;
+}
