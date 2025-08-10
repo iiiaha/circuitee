@@ -495,6 +495,24 @@ function deleteElement(elementId) {
     saveToURL();
 }
 
+// 스위치의 구수 계산
+function calculateSwitchGang(switchId) {
+    // 이 스위치에 연결된 모든 조명 찾기
+    const connectedLights = state.elements.filter(el => 
+        (el.type === 'light' || el.type === 'linear-light') && el.switchId === switchId
+    );
+    
+    // 연결된 조명들의 회로를 중복 없이 수집
+    const uniqueCircuits = new Set();
+    connectedLights.forEach(light => {
+        if (light.circuit) {
+            uniqueCircuits.add(light.circuit);
+        }
+    });
+    
+    return uniqueCircuits.size;
+}
+
 // 요소 선택
 function selectElement(elementId) {
     // 기존 선택 해제 및 정보 컨테이너 제거
@@ -537,6 +555,16 @@ function selectElement(elementId) {
                 <span class="element-info-value">${switchText}</span>
             `;
             infoContainer.appendChild(switchRow);
+        } else if (elementData.type === 'switch') {
+            // 스위치의 구수 정보
+            const gangCount = calculateSwitchGang(elementId);
+            const gangRow = document.createElement('div');
+            gangRow.className = 'element-info-row';
+            gangRow.innerHTML = `
+                <span class="element-info-label">구수:</span>
+                <span class="element-info-value">${gangCount}구</span>
+            `;
+            infoContainer.appendChild(gangRow);
         }
         
         // 삭제 버튼
@@ -681,6 +709,13 @@ function connectLightToSwitch(element1, element2) {
     
     if (existingConnection) return;
     
+    // 조명에 회로가 없으면 새로운 회로 생성
+    if (!light.circuit) {
+        const newCircuitId = `c${state.circuitCounter++}`;
+        light.circuit = newCircuitId;
+        state.circuits[newCircuitId] = [light.id];
+    }
+    
     // 조명이 회로에 속해있는 경우
     if (light.circuit) {
         // 같은 회로의 모든 조명들의 스위치 속성을 업데이트
@@ -700,16 +735,6 @@ function connectLightToSwitch(element1, element2) {
         });
         
         // 직접 클릭한 조명과 스위치 사이에만 연결선 추가
-        state.connections.push({
-            from: light.id,
-            to: switchEl.id,
-            type: 'control'
-        });
-    } else {
-        // 회로에 속하지 않은 단일 조명
-        light.switchId = switchEl.id;
-        
-        // 연결 정보 저장
         state.connections.push({
             from: light.id,
             to: switchEl.id,
