@@ -20,7 +20,7 @@ const dom = {
     floorPlanLayer: null,
     connectionLayer: null,
     elementLayer: null,
-    uploadArea: null,
+    uploadBtn: null,
     fileInput: null,
     modeToggle: null,
     shareBtn: null,
@@ -47,7 +47,7 @@ function initDOM() {
     dom.floorPlanLayer = document.getElementById('floorPlanLayer');
     dom.connectionLayer = document.getElementById('connectionLayer');
     dom.elementLayer = document.getElementById('elementLayer');
-    dom.uploadArea = document.getElementById('uploadArea');
+    dom.uploadBtn = document.getElementById('uploadBtn');
     dom.fileInput = document.getElementById('fileInput');
     dom.modeToggle = document.getElementById('modeToggle');
     dom.shareBtn = document.getElementById('shareBtn');
@@ -63,16 +63,11 @@ function initDOM() {
 // 이벤트 리스너 설정
 function setupEventListeners() {
     // 파일 업로드
-    dom.uploadArea.addEventListener('click', () => dom.fileInput.click());
+    dom.uploadBtn.addEventListener('click', () => dom.fileInput.click());
     dom.fileInput.addEventListener('change', handleFileUpload);
     
-    // 드래그앤드롭
-    dom.uploadArea.addEventListener('dragover', handleDragOver);
-    dom.uploadArea.addEventListener('dragleave', handleDragLeave);
-    dom.uploadArea.addEventListener('drop', handleDrop);
-    
     // 도구 버튼들
-    document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
+    document.querySelectorAll('.tool-btn-modern[data-tool]').forEach(btn => {
         btn.addEventListener('click', () => {
             // 토글 로직: 같은 도구를 다시 클릭하면 선택 해제
             if (state.selectedTool === btn.dataset.tool) {
@@ -132,26 +127,6 @@ function handleFileUpload(e) {
     }
 }
 
-// 드래그 오버 처리
-function handleDragOver(e) {
-    e.preventDefault();
-    dom.uploadArea.classList.add('dragover');
-}
-
-// 드래그 리브 처리
-function handleDragLeave() {
-    dom.uploadArea.classList.remove('dragover');
-}
-
-// 드롭 처리
-function handleDrop(e) {
-    e.preventDefault();
-    dom.uploadArea.classList.remove('dragover');
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) {
-        processImageFile(file);
-    }
-}
 
 // 이미지 파일 처리
 function processImageFile(file) {
@@ -215,7 +190,7 @@ function selectTool(tool) {
     if (marker) marker.remove();
     
     // 도구 버튼 상태 업데이트
-    document.querySelectorAll('.tool-btn').forEach(btn => {
+    document.querySelectorAll('.tool-btn-modern').forEach(btn => {
         btn.classList.remove('active');
     });
     
@@ -245,8 +220,27 @@ function selectTool(tool) {
 
 // 캔버스 클릭 처리
 function handleCanvasClick(e) {
+    // 테스트 모드에서는 회로 토글 버튼 닫기
+    if (state.mode === 'test') {
+        if (!e.target.closest('.element') && !e.target.closest('.circuit-toggles')) {
+            document.querySelectorAll('.circuit-toggles').forEach(el => el.remove());
+        }
+        return;
+    }
+    
     if (state.mode !== 'edit') return;
     if (e.target.closest('.element')) return;
+    
+    // 편집 모드에서 빈 공간 클릭 시 선택 해제
+    if (!state.selectedTool) {
+        document.querySelectorAll('.element.selected').forEach(el => {
+            el.classList.remove('selected');
+        });
+        document.querySelectorAll('.element-info-container').forEach(container => {
+            container.remove();
+        });
+        state.selectedElement = null;
+    }
     
     const rect = dom.elementLayer.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -426,7 +420,7 @@ function renderElement(element) {
     if (state.mode === 'edit') {
         setupElementInteractions(div, element);
     } else if (state.mode === 'test' && element.type === 'switch') {
-        div.addEventListener('click', (e) => handleSwitchToggle(e, element));
+        div.addEventListener('click', (e) => handleSwitchClick(e, element));
     }
     
     dom.elementLayer.appendChild(div);
@@ -511,6 +505,24 @@ function calculateSwitchGang(switchId) {
     });
     
     return uniqueCircuits.size;
+}
+
+// 스위치에 연결된 회로들 가져오기
+function getSwitchCircuits(switchId) {
+    // 이 스위치에 연결된 모든 조명 찾기
+    const connectedLights = state.elements.filter(el => 
+        (el.type === 'light' || el.type === 'linear-light') && el.switchId === switchId
+    );
+    
+    // 연결된 조명들의 회로를 중복 없이 수집
+    const uniqueCircuits = new Set();
+    connectedLights.forEach(light => {
+        if (light.circuit) {
+            uniqueCircuits.add(light.circuit);
+        }
+    });
+    
+    return Array.from(uniqueCircuits).sort();
 }
 
 // 요소 선택
@@ -946,32 +958,83 @@ function setupDragging(element, elementData) {
     };
 }
 
-// 스위치 토글 처리
-function handleSwitchToggle(e, switchData) {
+// 스위치 클릭 처리 (테스트 모드)
+function handleSwitchClick(e, switchData) {
     e.stopPropagation();
     const switchEl = e.currentTarget;
     
-    // 스위치 상태 토글
-    switchEl.classList.toggle('active');
-    const isActive = switchEl.classList.contains('active');
+    // 기존 회로 토글 버튼이 있으면 제거
+    const existingToggles = document.querySelector('.circuit-toggles');
+    if (existingToggles && existingToggles.dataset.switchId === switchData.id) {
+        existingToggles.remove();
+        return;
+    }
     
-    // 이 스위치에 연결된 모든 조명 찾기
-    const connectedLights = state.elements.filter(el => 
-        (el.type === 'light' || el.type === 'linear-light') && el.switchId === switchData.id
+    // 다른 스위치의 토글 버튼 제거
+    document.querySelectorAll('.circuit-toggles').forEach(el => el.remove());
+    
+    // 이 스위치에 연결된 회로들 가져오기
+    const circuits = getSwitchCircuits(switchData.id);
+    
+    if (circuits.length === 0) return;
+    
+    // 회로별 토글 버튼 컨테이너 생성
+    const toggleContainer = document.createElement('div');
+    toggleContainer.className = 'circuit-toggles';
+    toggleContainer.dataset.switchId = switchData.id;
+    
+    // 각 회로별로 토글 버튼 생성
+    circuits.forEach(circuitId => {
+        const toggleBtn = document.createElement('div');
+        toggleBtn.className = 'circuit-toggle';
+        toggleBtn.dataset.circuit = circuitId;
+        
+        // 현재 회로의 조명 상태 확인
+        const circuitLights = state.elements.filter(el => 
+            (el.type === 'light' || el.type === 'linear-light') && 
+            el.switchId === switchData.id && 
+            el.circuit === circuitId
+        );
+        
+        // 하나라도 켜져있으면 active
+        const isActive = circuitLights.some(light => light.state);
+        if (isActive) {
+            toggleBtn.classList.add('active');
+        }
+        
+        // 클릭 이벤트
+        toggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleCircuitToggle(switchData.id, circuitId, toggleBtn);
+        });
+        
+        toggleContainer.appendChild(toggleBtn);
+    });
+    
+    switchEl.appendChild(toggleContainer);
+}
+
+// 회로별 토글 처리
+function handleCircuitToggle(switchId, circuitId, toggleBtn) {
+    // 토글 버튼 상태 변경
+    toggleBtn.classList.toggle('active');
+    const isActive = toggleBtn.classList.contains('active');
+    
+    // 해당 회로의 조명들만 토글
+    const circuitLights = state.elements.filter(el => 
+        (el.type === 'light' || el.type === 'linear-light') && 
+        el.switchId === switchId && 
+        el.circuit === circuitId
     );
     
     // 연결된 조명 토글
-    connectedLights.forEach(lightData => {
+    circuitLights.forEach(lightData => {
         const lightEl = document.getElementById(lightData.id);
         if (lightEl) {
             lightData.state = isActive;
             lightEl.classList.toggle('on', isActive);
         }
     });
-    
-    if (state.mode === 'edit') {
-        saveToURL();
-    }
 }
 
 // 모드 전환
@@ -979,6 +1042,9 @@ function toggleMode() {
     state.mode = state.mode === 'edit' ? 'test' : 'edit';
     dom.modeToggle.textContent = state.mode === 'edit' ? '편집 모드' : '테스트 모드';
     document.body.classList.toggle('test-mode', state.mode === 'test');
+    
+    // 회로 토글 버튼 제거
+    document.querySelectorAll('.circuit-toggles').forEach(el => el.remove());
     
     // 도구 선택 해제
     selectTool(null);

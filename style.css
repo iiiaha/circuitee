@@ -79,11 +79,12 @@ h1 {
 
 /* 사이드바 */
 .sidebar {
-    width: 250px;
-    background: white;
-    border-right: 1px solid #ddd;
-    padding: 1.5rem;
-    overflow-y: auto;
+    width: 280px;
+    background: #f8f9fa;
+    border-right: 1px solid #e9ecef;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     flex-shrink: 0;
 }
 
@@ -91,73 +92,110 @@ h1 {
     display: none;
 }
 
-.sidebar h3 {
-    font-size: 1.1rem;
-    margin-bottom: 1rem;
-    color: #333;
+.sidebar-header {
+    padding: 1.5rem;
+    background: white;
+    border-bottom: 1px solid #e9ecef;
 }
 
-.tool-section {
-    margin-bottom: 2rem;
+.sidebar-header h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #212529;
+    margin: 0;
 }
 
-.tool-section h4 {
-    font-size: 0.9rem;
-    color: #666;
+.sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+.tool-group {
+    margin-bottom: 1.5rem;
+}
+
+.tool-group-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6c757d;
     margin-bottom: 0.5rem;
 }
 
-/* 업로드 영역 */
-.upload-area {
-    border: 2px dashed #ddd;
-    border-radius: 8px;
-    padding: 2rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s;
+.tool-group-bottom {
+    margin-top: auto;
+    margin-bottom: 0;
+    padding-top: 1rem;
+    border-top: 1px solid #e9ecef;
 }
 
-.upload-area:hover {
-    border-color: #4CAF50;
-    background: #f9f9f9;
-}
 
-.upload-area.dragover {
-    border-color: #4CAF50;
-    background: #e8f5e9;
-}
-
-.upload-area p {
-    color: #666;
-    font-size: 0.9rem;
-}
-
-/* 도구 버튼 */
-.tool-btn {
+/* 모던 도구 버튼 */
+.tool-btn-modern {
     width: 100%;
-    padding: 0.8rem;
-    border: 1px solid #ddd;
+    padding: 0.75rem 1rem;
+    border: none;
     background: white;
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
     margin-bottom: 0.5rem;
     transition: all 0.2s;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #495057;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.tool-btn:hover {
-    background: #f5f5f5;
+.tool-btn-modern:hover {
+    background: #f8f9fa;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 
-.tool-btn.active {
-    background: #e3f2fd;
-    border-color: #2196F3;
+.tool-btn-modern.active {
+    background: #007bff;
+    color: white;
+    box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
 }
 
-.tool-btn .icon {
-    font-size: 1.2rem;
+.tool-btn-modern.active .tool-icon {
+    color: white;
+}
+
+.tool-btn-danger {
+    background: #fff5f5;
+    color: #dc3545;
+}
+
+.tool-btn-danger:hover {
+    background: #dc3545;
+    color: white;
+}
+
+.tool-btn-danger .tool-icon {
+    color: #dc3545;
+}
+
+.tool-btn-danger:hover .tool-icon {
+    color: white;
+}
+
+.tool-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    color: #6c757d;
+    transition: color 0.2s;
+}
+
+/* 기존 tool-btn 클래스는 호환성을 위해 유지 */
+.tool-btn {
+    display: none;
 }
 
 /* 캔버스 컨테이너 */
@@ -217,7 +255,7 @@ h1 {
     user-select: none;
 }
 
-.element:hover:not(.linear-light) {
+.element:hover:not(.linear-light):not(.switch) {
     transform: scale(1.05);
 }
 
@@ -511,7 +549,50 @@ body.test-mode .element.switch {
 }
 
 body.test-mode .element.switch:hover {
-    transform: scale(1.1);
+    /* 호버 효과 제거 */
+}
+
+/* 회로별 토글 버튼 컨테이너 */
+.circuit-toggles {
+    position: absolute;
+    left: calc(100% + 5px);
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    gap: 2px;
+    z-index: 100;
+}
+
+.circuit-toggle {
+    width: 10px;
+    height: 20px;
+    background: #333;
+    border: 1px solid #222;
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: 0;
+    position: relative;
+    transition: background 0.2s;
+}
+
+.circuit-toggle:hover {
+    background: #555;
+}
+
+.circuit-toggle.active {
+    background: #999;
+    border-color: #888;
+}
+
+.circuit-toggle::after {
+    content: attr(data-circuit);
+    position: absolute;
+    bottom: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 8px;
+    color: #666;
+    white-space: nowrap;
 }
 
 /* Canvas background for testing transparency */
