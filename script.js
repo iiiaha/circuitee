@@ -10,7 +10,8 @@ let state = {
     selectedElement: null,
     connectingFrom: null,
     elementIdCounter: 1,
-    dragListeners: new Map() // 메모리 누수 방지를 위한 리스너 관리
+    dragListeners: new Map(), // 메모리 누수 방지를 위한 리스너 관리
+    linearLightStart: null // 직선 조명 첫 번째 클릭 지점
 };
 
 // DOM 요소들
@@ -72,11 +73,25 @@ function setupEventListeners() {
     
     // 도구 버튼들
     document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
-        btn.addEventListener('click', () => selectTool(btn.dataset.tool));
+        btn.addEventListener('click', () => {
+            // 토글 로직: 같은 도구를 다시 클릭하면 선택 해제
+            if (state.selectedTool === btn.dataset.tool) {
+                selectTool(null);
+            } else {
+                selectTool(btn.dataset.tool);
+            }
+        });
     });
     
     // 연결 버튼
-    dom.connectBtn.addEventListener('click', () => selectTool('connect'));
+    dom.connectBtn.addEventListener('click', () => {
+        // 토글 로직: 연결 모드가 활성화되어 있으면 해제
+        if (state.selectedTool === 'connect') {
+            selectTool(null);
+        } else {
+            selectTool('connect');
+        }
+    });
     
     // 캔버스 클릭
     dom.elementLayer.addEventListener('click', handleCanvasClick);
@@ -193,6 +208,11 @@ function selectTool(tool) {
     state.selectedTool = tool;
     state.connectingFrom = null;
     state.selectedElement = null;
+    state.linearLightStart = null; // 직선 조명 시작점 초기화
+    
+    // 직선 조명 마커 제거
+    const marker = document.getElementById('linear-light-marker');
+    if (marker) marker.remove();
     
     // 도구 버튼 상태 업데이트
     document.querySelectorAll('.tool-btn').forEach(btn => {
@@ -228,12 +248,94 @@ function handleCanvasClick(e) {
     if (state.mode !== 'edit') return;
     if (e.target.closest('.element')) return;
     
+    const rect = dom.elementLayer.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
     if (state.selectedTool === 'switch' || state.selectedTool === 'light') {
-        const rect = dom.elementLayer.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
         addElement(state.selectedTool, x, y);
+    } else if (state.selectedTool === 'linear-light') {
+        handleLinearLightClick(x, y);
     }
+}
+
+// 직선 조명 클릭 처리
+function handleLinearLightClick(x, y) {
+    if (!state.linearLightStart) {
+        // 첫 번째 클릭 - 시작점 저장
+        state.linearLightStart = { x, y };
+        
+        // 시작점 표시 (임시 마커)
+        const marker = document.createElement('div');
+        marker.id = 'linear-light-marker';
+        marker.style.position = 'absolute';
+        marker.style.left = (x - 3) + 'px';
+        marker.style.top = (y - 3) + 'px';
+        marker.style.width = '6px';
+        marker.style.height = '6px';
+        marker.style.borderRadius = '50%';
+        marker.style.background = '#2196F3';
+        marker.style.zIndex = '1000';
+        dom.elementLayer.appendChild(marker);
+    } else {
+        // 두 번째 클릭 - 직선 조명 생성
+        const start = state.linearLightStart;
+        
+        // 시작점 마커 제거
+        const marker = document.getElementById('linear-light-marker');
+        if (marker) marker.remove();
+        
+        // 직선 조명 생성
+        addLinearLight(start.x, start.y, x, y);
+        
+        // 상태 초기화
+        state.linearLightStart = null;
+    }
+}
+
+// 직선 조명 추가
+function addLinearLight(x1, y1, x2, y2) {
+    // 기존 조명 번호들 확인
+    const existingNumbers = state.elements
+        .filter(el => el.type === 'light' || el.type === 'linear-light')
+        .map(el => parseInt(el.label.replace('L', '')))
+        .sort((a, b) => a - b);
+    
+    let newNumber = 1;
+    if (existingNumbers.length > 0) {
+        // 1부터 시작해서 빈 번호 찾기
+        for (let i = 1; i <= existingNumbers[existingNumbers.length - 1] + 1; i++) {
+            if (!existingNumbers.includes(i)) {
+                newNumber = i;
+                break;
+            }
+        }
+    }
+    
+    const label = `L${newNumber}`;
+    
+    // 길이와 각도 계산
+    const length = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+    const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+    
+    const element = {
+        id: `element-${state.elementIdCounter++}`,
+        type: 'linear-light',
+        x: x1,
+        y: y1,
+        x2: x2,
+        y2: y2,
+        length: length,
+        angle: angle,
+        state: false,
+        label: label,
+        circuit: null,
+        switchId: null
+    };
+    
+    state.elements.push(element);
+    renderElement(element);
+    saveToURL();
 }
 
 // 요소 추가
@@ -312,6 +414,13 @@ function renderElement(element) {
         if (element.state) {
             div.classList.add('on');
         }
+    } else if (element.type === 'linear-light') {
+        // 직선 조명 스타일 설정
+        div.style.width = element.length + 'px';
+        div.style.transform = `rotate(${element.angle}deg)`;
+        if (element.state) {
+            div.classList.add('on');
+        }
     }
     
     if (state.mode === 'edit') {
@@ -351,7 +460,7 @@ function deleteElement(elementId) {
     if (!element) return;
     
     // 조명인 경우 회로에서 제거
-    if (element.type === 'light' && element.circuit) {
+    if ((element.type === 'light' || element.type === 'linear-light') && element.circuit) {
         const circuit = state.circuits[element.circuit];
         if (circuit) {
             state.circuits[element.circuit] = circuit.filter(id => id !== elementId);
@@ -364,7 +473,7 @@ function deleteElement(elementId) {
     // 다른 조명의 스위치 속성에서 이 요소 제거
     if (element.type === 'switch') {
         state.elements.forEach(el => {
-            if (el.type === 'light' && el.switchId === elementId) {
+            if ((el.type === 'light' || el.type === 'linear-light') && el.switchId === elementId) {
                 el.switchId = null;
             }
         });
@@ -407,7 +516,7 @@ function selectElement(elementId) {
         const infoContainer = document.createElement('div');
         infoContainer.className = 'element-info-container';
         
-        if (elementData.type === 'light') {
+        if (elementData.type === 'light' || elementData.type === 'linear-light') {
             // 회로 정보
             const circuitRow = document.createElement('div');
             circuitRow.className = 'element-info-row';
@@ -462,11 +571,13 @@ function handleConnectionClick(elementData) {
         
         if (state.connectingFrom !== elementData.id) {
             // 같은 요소가 아닐 때만 연결
-            if (fromElement.type === 'light' && toElement.type === 'light') {
+            const isLight = (el) => el.type === 'light' || el.type === 'linear-light';
+            
+            if (isLight(fromElement) && isLight(toElement)) {
                 // 조명-조명 연결 (회로)
                 connectLights(fromElement, toElement);
-            } else if ((fromElement.type === 'light' && toElement.type === 'switch') || 
-                       (fromElement.type === 'switch' && toElement.type === 'light')) {
+            } else if ((isLight(fromElement) && toElement.type === 'switch') || 
+                       (fromElement.type === 'switch' && isLight(toElement))) {
                 // 조명-스위치 연결 (제어)
                 connectLightToSwitch(fromElement, toElement);
             }
@@ -558,7 +669,8 @@ function connectLights(light1, light2) {
 
 // 조명-스위치 연결 (제어)
 function connectLightToSwitch(element1, element2) {
-    const light = element1.type === 'light' ? element1 : element2;
+    const isLight = (el) => el.type === 'light' || el.type === 'linear-light';
+    const light = isLight(element1) ? element1 : element2;
     const switchEl = element1.type === 'switch' ? element1 : element2;
     
     // 이미 연결되어 있는지 확인
@@ -679,16 +791,46 @@ function drawConnection(fromId, toId) {
     if (!fromData || !toData) return;
     
     // 각 요소 타입에 따른 중심점 계산
-    const x1 = fromData.x + (fromData.type === 'switch' ? 16 : 4);
-    const y1 = fromData.y + (fromData.type === 'switch' ? 8 : 4);
-    const x2 = toData.x + (toData.type === 'switch' ? 16 : 4);
-    const y2 = toData.y + (toData.type === 'switch' ? 8 : 4);
+    let x1, y1, x2, y2;
+    
+    if (fromData.type === 'switch') {
+        x1 = fromData.x + 16;
+        y1 = fromData.y + 8;
+    } else if (fromData.type === 'light') {
+        x1 = fromData.x + 4;
+        y1 = fromData.y + 4;
+    } else if (fromData.type === 'linear-light') {
+        // 직선 조명의 중심점
+        x1 = fromData.x + (fromData.x2 - fromData.x) / 2;
+        y1 = fromData.y + (fromData.y2 - fromData.y) / 2;
+    }
+    
+    if (toData.type === 'switch') {
+        x2 = toData.x + 16;
+        y2 = toData.y + 8;
+    } else if (toData.type === 'light') {
+        x2 = toData.x + 4;
+        y2 = toData.y + 4;
+    } else if (toData.type === 'linear-light') {
+        // 직선 조명의 중심점
+        x2 = toData.x + (toData.x2 - toData.x) / 2;
+        y2 = toData.y + (toData.y2 - toData.y) / 2;
+    }
     
     const distance = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
     const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
     
+    // 연결 타입 확인
+    const connection = state.connections.find(
+        conn => (conn.from === fromId && conn.to === toId) || 
+                (conn.from === toId && conn.to === fromId)
+    );
+    
     const line = document.createElement('div');
     line.className = 'connection-line';
+    if (connection && connection.type) {
+        line.classList.add(connection.type);
+    }
     line.style.left = x1 + 'px';
     line.style.top = y1 + 'px';
     line.style.width = distance + 'px';
@@ -739,6 +881,14 @@ function setupDragging(element, elementData) {
         newX = Math.max(0, Math.min(newX, rect.width - element.offsetWidth));
         newY = Math.max(0, Math.min(newY, rect.height - element.offsetHeight));
         
+        // 직선 조명의 경우 끝점도 같이 이동
+        if (elementData.type === 'linear-light') {
+            const deltaX = newX - elementData.x;
+            const deltaY = newY - elementData.y;
+            elementData.x2 += deltaX;
+            elementData.y2 += deltaY;
+        }
+        
         elementData.x = newX;
         elementData.y = newY;
         element.style.left = newX + 'px';
@@ -782,7 +932,7 @@ function handleSwitchToggle(e, switchData) {
     
     // 이 스위치에 연결된 모든 조명 찾기
     const connectedLights = state.elements.filter(el => 
-        el.type === 'light' && el.switchId === switchData.id
+        (el.type === 'light' || el.type === 'linear-light') && el.switchId === switchData.id
     );
     
     // 연결된 조명 토글

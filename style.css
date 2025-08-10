@@ -217,7 +217,7 @@ h1 {
     user-select: none;
 }
 
-.element:hover {
+.element:hover:not(.linear-light) {
     transform: scale(1.05);
 }
 
@@ -243,20 +243,39 @@ h1 {
 .element.light {
     width: 8px;
     height: 8px;
-    background: #fff;
+    background: #ffd700;
     border-radius: 50%;
     border: 1px solid #000;
     z-index: 10;
-    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+    transition: box-shadow 0.3s ease, border-color 0.3s ease, background 0.3s ease;
 }
 
 .element.light.on {
     background: #fff;
     border-color: #ffd700;
     box-shadow: 
-        0 0 20px 10px rgba(255, 235, 59, 0.6),
-        0 0 40px 20px rgba(255, 235, 59, 0.4),
-        0 0 60px 30px rgba(255, 235, 59, 0.2);
+        0 0 10px 5px rgba(255, 235, 59, 0.6),
+        0 0 20px 10px rgba(255, 235, 59, 0.4),
+        0 0 30px 15px rgba(255, 235, 59, 0.2);
+}
+
+.element.linear-light {
+    position: absolute;
+    height: 3px;
+    background: #ffd700;
+    border: 1px solid #000;
+    z-index: 10;
+    transition: box-shadow 0.3s ease, background 0.3s ease;
+    transform-origin: left center;
+    cursor: move;
+}
+
+.element.linear-light.on {
+    background: #fff;
+    border-color: #ffd700;
+    box-shadow: 
+        0 0 8px 4px rgba(255, 235, 59, 0.6),
+        0 0 16px 8px rgba(255, 235, 59, 0.4);
 }
 
 .element.selected {
@@ -266,6 +285,25 @@ h1 {
 
 /* 요소 정보 컨테이너 */
 .element.light .element-info-container {
+    position: absolute;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 255, 255, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 10px;
+    padding: 4px 6px;
+    box-shadow: 
+        0 0 0 0.5px rgba(0, 0, 0, 0.05),
+        0 2px 4px rgba(0, 0, 0, 0.08),
+        0 4px 12px rgba(0, 0, 0, 0.08);
+    z-index: 100;
+    min-width: 80px;
+    font-size: 0.65rem;
+    overflow: hidden;
+}
+
+.element.linear-light .element-info-container {
     position: absolute;
     bottom: 18px;
     left: 50%;
@@ -369,14 +407,24 @@ h1 {
     background: #d32f2f;
 }
 
-.element.connecting {
+.element.connecting:not(.linear-light) {
     animation: pulse 1s infinite;
+}
+
+.element.linear-light.connecting {
+    animation: linear-pulse 1s infinite;
 }
 
 @keyframes pulse {
     0% { transform: scale(1); }
     50% { transform: scale(1.1); }
     100% { transform: scale(1); }
+}
+
+@keyframes linear-pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.6; }
+    100% { opacity: 1; }
 }
 
 /* 연결선 */
@@ -386,6 +434,16 @@ h1 {
     background: #666;
     transform-origin: left center;
     pointer-events: none;
+}
+
+.connection-line.circuit {
+    background: rgba(76, 175, 80, 0.6);
+    height: 3px;
+}
+
+.connection-line.control {
+    background: rgba(33, 150, 243, 0.6);
+    height: 3px;
 }
 
 /* 모달 */
