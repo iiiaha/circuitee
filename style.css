@@ -405,11 +405,7 @@ body {
 }
 
 /* 요소 정보 컨테이너 */
-.element.light .element-info-container {
-    position: absolute;
-    bottom: 18px;
-    left: 50%;
-    transform: translateX(-50%);
+.element-info-container {
     background: rgba(255, 255, 255, 0.75);
     border: 1px solid rgba(255, 255, 255, 0.5);
     border-radius: 10px;
@@ -418,45 +414,7 @@ body {
         0 0 0 0.5px rgba(0, 0, 0, 0.05),
         0 2px 4px rgba(0, 0, 0, 0.08),
         0 4px 12px rgba(0, 0, 0, 0.08);
-    z-index: 100;
-    min-width: 80px;
-    font-size: 0.65rem;
-    overflow: hidden;
-}
-
-.element.linear-light .element-info-container {
-    position: absolute;
-    bottom: 18px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(255, 255, 255, 0.75);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    border-radius: 10px;
-    padding: 4px 6px;
-    box-shadow: 
-        0 0 0 0.5px rgba(0, 0, 0, 0.05),
-        0 2px 4px rgba(0, 0, 0, 0.08),
-        0 4px 12px rgba(0, 0, 0, 0.08);
-    z-index: 100;
-    min-width: 80px;
-    font-size: 0.65rem;
-    overflow: hidden;
-}
-
-.element.switch .element-info-container {
-    position: absolute;
-    bottom: 28px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(255, 255, 255, 0.75);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    border-radius: 10px;
-    padding: 4px 6px;
-    box-shadow: 
-        0 0 0 0.5px rgba(0, 0, 0, 0.05),
-        0 2px 4px rgba(0, 0, 0, 0.08),
-        0 4px 12px rgba(0, 0, 0, 0.08);
-    z-index: 9999;
+    z-index: 10000;
     min-width: 80px;
     font-size: 0.65rem;
     overflow: hidden;

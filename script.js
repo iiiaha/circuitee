@@ -695,6 +695,7 @@ function selectElement(elementId) {
         // 정보 컨테이너 생성
         const infoContainer = document.createElement('div');
         infoContainer.className = 'element-info-container';
+        infoContainer.dataset.elementId = elementId;
         
         if (elementData.type === 'light' || elementData.type === 'linear-light') {
             // 회로 정보
@@ -744,7 +745,26 @@ function selectElement(elementId) {
         arrow.className = 'element-info-arrow';
         infoContainer.appendChild(arrow);
         
-        element.appendChild(infoContainer);
+        // 위치 계산
+        const rect = element.getBoundingClientRect();
+        const canvasRect = dom.canvas.getBoundingClientRect();
+        
+        infoContainer.style.position = 'fixed';
+        infoContainer.style.left = rect.left + rect.width / 2 + 'px';
+        
+        // 요소 타입에 따라 위치 조정 - 정보 컨테이너가 요소 위에 위치하도록
+        if (elementData.type === 'switch') {
+            infoContainer.style.bottom = (window.innerHeight - rect.top + 10) + 'px';
+            infoContainer.style.top = 'auto';
+        } else {
+            // 조명 요소의 경우 요소 위에 표시
+            infoContainer.style.bottom = (window.innerHeight - rect.top + 5) + 'px';
+            infoContainer.style.top = 'auto';
+        }
+        
+        infoContainer.style.transform = 'translateX(-50%)';
+        
+        document.body.appendChild(infoContainer);
     }
 }
 
