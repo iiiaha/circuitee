@@ -11,8 +11,12 @@ let state = {
     connectingFrom: null,
     elementIdCounter: 1,
     dragListeners: new Map(), // 메모리 누수 방지를 위한 리스너 관리
-    linearLightStart: null, // 직선 조명 첫 번째 클릭 지점
-    circuitColors: {} // 회로별 색상 저장 {circuitId: color}
+    linearLightStart: null, // 라인 조명 첫 번째 클릭 지점
+    circuitColors: {}, // 회로별 색상 저장 {circuitId: color}
+    csvImportMode: false, // CSV 가져오기 모드
+    csvData: null, // CSV 데이터 임시 저장
+    referencePoints: [], // 참조점 [sketchup: {p1, p2}, circuitee: {p1, p2}]
+    csvReferenceMode: false // 참조점 선택 모드
 };
 
 // Undo/Redo 스택
@@ -55,6 +59,8 @@ function initDOM() {
     dom.elementLayer = document.getElementById('elementLayer');
     dom.uploadBtn = document.getElementById('uploadBtn');
     dom.fileInput = document.getElementById('fileInput');
+    dom.csvUploadBtn = document.getElementById('csvUploadBtn');
+    dom.csvInput = document.getElementById('csvInput');
     dom.modeToggle = document.getElementById('modeToggle');
     dom.shareBtn = document.getElementById('shareBtn');
     dom.sidebar = document.getElementById('sidebar');
@@ -73,6 +79,10 @@ function setupEventListeners() {
     // 파일 업로드
     dom.uploadBtn.addEventListener('click', () => dom.fileInput.click());
     dom.fileInput.addEventListener('change', handleFileUpload);
+    
+    // CSV 업로드
+    dom.csvUploadBtn.addEventListener('click', () => dom.csvInput.click());
+    dom.csvInput.addEventListener('change', handleCSVUpload);
     
     // 도구 버튼들
     document.querySelectorAll('.tool-btn-modern[data-tool]').forEach(btn => {
@@ -207,9 +217,9 @@ function selectTool(tool) {
     state.selectedTool = tool;
     state.connectingFrom = null;
     state.selectedElement = null;
-    state.linearLightStart = null; // 직선 조명 시작점 초기화
+    state.linearLightStart = null; // 라인 조명 시작점 초기화
     
-    // 직선 조명 마커 제거
+    // 라인 조명 마커 제거
     const marker = document.getElementById('linear-light-marker');
     if (marker) marker.remove();
     
@@ -255,6 +265,19 @@ function handleCanvasClick(e) {
     if (state.mode !== 'edit') return;
     if (e.target.closest('.element')) return;
     
+    const rect = dom.canvas.getBoundingClientRect();
+    const scrollLeft = dom.canvas.scrollLeft;
+    const scrollTop = dom.canvas.scrollTop;
+    const x = e.clientX - rect.left + scrollLeft;
+    const y = e.clientY - rect.top + scrollTop;
+    
+    
+    // CSV 참조점 모드
+    if (state.csvReferenceMode) {
+        handleCSVReferenceClick(x, y);
+        return;
+    }
+    
     // 편집 모드에서 빈 공간 클릭 시 선택 해제
     if (!state.selectedTool) {
         document.querySelectorAll('.element.selected').forEach(el => {
@@ -266,12 +289,6 @@ function handleCanvasClick(e) {
         state.selectedElement = null;
     }
     
-    const rect = dom.canvas.getBoundingClientRect();
-    const scrollLeft = dom.canvas.scrollLeft;
-    const scrollTop = dom.canvas.scrollTop;
-    const x = e.clientX - rect.left + scrollLeft;
-    const y = e.clientY - rect.top + scrollTop;
-    
     if (state.selectedTool === 'switch' || state.selectedTool === 'light') {
         addElement(state.selectedTool, x, y);
     } else if (state.selectedTool === 'linear-light') {
@@ -279,7 +296,7 @@ function handleCanvasClick(e) {
     }
 }
 
-// 직선 조명 클릭 처리
+// 라인 조명 클릭 처리
 function handleLinearLightClick(x, y) {
     if (!state.linearLightStart) {
         // 첫 번째 클릭 - 시작점 저장
@@ -298,14 +315,14 @@ function handleLinearLightClick(x, y) {
         marker.style.zIndex = '1000';
         dom.elementLayer.appendChild(marker);
     } else {
-        // 두 번째 클릭 - 직선 조명 생성
+        // 두 번째 클릭 - 라인 조명 생성
         const start = state.linearLightStart;
         
         // 시작점 마커 제거
         const marker = document.getElementById('linear-light-marker');
         if (marker) marker.remove();
         
-        // 직선 조명 생성
+        // 라인 조명 생성
         addLinearLight(start.x, start.y, x, y);
         
         // 상태 초기화
@@ -313,9 +330,9 @@ function handleLinearLightClick(x, y) {
     }
 }
 
-// 직선 조명 추가
+// 라인 조명 추가
 function addLinearLight(x1, y1, x2, y2) {
-    saveState('직선 조명 추가');
+    saveState('라인 조명 추가');
     // 기존 조명 번호들 확인
     const existingNumbers = state.elements
         .filter(el => el.type === 'light' || el.type === 'linear-light')
@@ -474,6 +491,7 @@ function addElement(type, x, y) {
         }
         
         label = `SW${newNumber}`;
+        
     } else {
         // 조명도 같은 방식으로
         const existingNumbers = state.elements
@@ -527,7 +545,7 @@ function renderElement(element) {
             div.classList.add('on');
         }
     } else if (element.type === 'linear-light') {
-        // 직선 조명 스타일 설정
+        // 라인 조명 스타일 설정
         div.style.width = element.length + 'px';
         div.style.transform = `rotate(${element.angle}deg)`;
         if (element.state) {
@@ -625,6 +643,18 @@ function generateFluorescentColor() {
         'hsl(200, 80%, 40%)', // 하늘
         'hsl(340, 80%, 40%)', // 핑크
         'hsl(150, 80%, 40%)', // 민트
+        'hsl(280, 80%, 40%)', // 진보라
+        'hsl(90, 80%, 40%)',  // 연두
+        'hsl(270, 80%, 40%)', // 남보라
+        'hsl(210, 80%, 40%)', // 진하늘
+        'hsl(160, 80%, 40%)', // 청록민트
+        'hsl(40, 80%, 40%)',  // 골드
+        'hsl(350, 80%, 40%)', // 진핑크
+        'hsl(190, 80%, 40%)', // 스카이블루
+        'hsl(130, 80%, 40%)', // 에메랄드
+        'hsl(50, 80%, 40%)',  // 라임
+        'hsl(320, 80%, 40%)', // 마젠타
+        'hsl(170, 80%, 40%)', // 터콰이즈
     ];
     
     // 랜덤하게 미리 정의된 색상 선택
@@ -786,16 +816,26 @@ function handleConnectionClick(elementData) {
             if (isLight(fromElement) && isLight(toElement)) {
                 // 조명-조명 연결 (회로)
                 connectLights(fromElement, toElement);
+                
+                // 스위치가 아닌 경우, 두 번째 요소를 새로운 시작점으로
+                document.getElementById(state.connectingFrom).classList.remove('connecting');
+                state.connectingFrom = toElement.id;
+                document.getElementById(toElement.id).classList.add('connecting');
+                
             } else if ((isLight(fromElement) && toElement.type === 'switch') || 
                        (fromElement.type === 'switch' && isLight(toElement))) {
                 // 조명-스위치 연결 (제어)
                 connectLightToSwitch(fromElement, toElement);
+                
+                // 스위치에 도달했으므로 연결 종료
+                document.getElementById(state.connectingFrom).classList.remove('connecting');
+                state.connectingFrom = null;
             }
+        } else {
+            // 같은 요소를 다시 클릭하면 연결 취소
+            document.getElementById(state.connectingFrom).classList.remove('connecting');
+            state.connectingFrom = null;
         }
-        
-        // 연결 완료 후 상태 초기화
-        document.getElementById(state.connectingFrom).classList.remove('connecting');
-        state.connectingFrom = null;
     }
 }
 
@@ -1009,7 +1049,7 @@ function drawConnection(fromId, toId) {
         x1 = fromData.x + 4;
         y1 = fromData.y + 4;
     } else if (fromData.type === 'linear-light') {
-        // 직선 조명의 중심점
+        // 라인 조명의 중심점
         x1 = fromData.x + (fromData.x2 - fromData.x) / 2;
         y1 = fromData.y + (fromData.y2 - fromData.y) / 2;
     }
@@ -1021,7 +1061,7 @@ function drawConnection(fromId, toId) {
         x2 = toData.x + 4;
         y2 = toData.y + 4;
     } else if (toData.type === 'linear-light') {
-        // 직선 조명의 중심점
+        // 라인 조명의 중심점
         x2 = toData.x + (toData.x2 - toData.x) / 2;
         y2 = toData.y + (toData.y2 - toData.y) / 2;
     }
@@ -1130,7 +1170,7 @@ function setupDragging(element, elementData) {
         newX = Math.max(0, Math.min(newX, canvasWidth - element.offsetWidth));
         newY = Math.max(0, Math.min(newY, canvasHeight - element.offsetHeight));
         
-        // 직선 조명의 경우 끝점도 같이 이동
+        // 라인 조명의 경우 끝점도 같이 이동
         if (elementData.type === 'linear-light') {
             const deltaX = newX - elementData.x;
             const deltaY = newY - elementData.y;
@@ -1437,6 +1477,384 @@ function clearAll() {
     renderAll();
     saveToURL();
 }
+
+// CSV 업로드 처리
+function handleCSVUpload(e) {
+    const file = e.target.files[0];
+    if (file && file.type === 'text/csv') {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            parseCSV(e.target.result);
+        };
+        reader.readAsText(file);
+    }
+}
+
+// CSV 파싱
+function parseCSV(csvText) {
+    const lines = csvText.trim().split('\n');
+    const header = lines[0].split(',');
+    
+    const lights = [];
+    const references = {
+        sketchup: { p1: null, p2: null }
+    };
+    
+    for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',');
+        const type = values[0];
+        
+        if (type === 'reference1') {
+            references.sketchup.p1 = {
+                x: parseFloat(values[1]),
+                y: parseFloat(values[2]),
+                z: parseFloat(values[3])
+            };
+        } else if (type === 'reference2') {
+            references.sketchup.p2 = {
+                x: parseFloat(values[1]),
+                y: parseFloat(values[2]),
+                z: parseFloat(values[3])
+            };
+        } else if (type === 'point') {
+            lights.push({
+                type: 'light',
+                x: parseFloat(values[1]),
+                y: parseFloat(values[2]),
+                z: parseFloat(values[3]),
+                name: values[7] || 'Light'
+            });
+        } else if (type === 'linear') {
+            lights.push({
+                type: 'linear-light',
+                x1: parseFloat(values[1]),
+                y1: parseFloat(values[2]),
+                z1: parseFloat(values[3]),
+                x2: parseFloat(values[4]),
+                y2: parseFloat(values[5]),
+                z2: parseFloat(values[6]),
+                name: values[7] || 'LinearLight'
+            });
+        } else if (type === 'switch') {
+            lights.push({
+                type: 'switch',
+                x: parseFloat(values[1]),
+                y: parseFloat(values[2]),
+                z: parseFloat(values[3]),
+                name: values[7] || 'Switch'
+            });
+        }
+    }
+    
+    // CSV 데이터 저장
+    state.csvData = lights;
+    state.referencePoints.sketchup = references.sketchup;
+    
+    // 참조점 선택 모드 시작
+    startCSVReferenceMode();
+}
+
+// CSV 참조점 모드 시작
+function startCSVReferenceMode() {
+    state.csvReferenceMode = true;
+    state.referencePoints.circuitee = { p1: null, p2: null };
+    
+    // 안내 메시지 표시
+    showCSVMessage('첫 번째 참조점을 클릭하세요 (SketchUp에서 선택한 첫 번째 점과 동일한 위치)');
+}
+
+// CSV 참조점 클릭 처리
+function handleCSVReferenceClick(x, y) {
+    if (!state.referencePoints.circuitee.p1) {
+        // 첫 번째 참조점
+        state.referencePoints.circuitee.p1 = { x, y };
+        
+        // 마커 표시
+        const marker = document.createElement('div');
+        marker.className = 'reference-marker';
+        marker.style.left = (x - 5) + 'px';
+        marker.style.top = (y - 5) + 'px';
+        marker.dataset.ref = '1';
+        dom.elementLayer.appendChild(marker);
+        
+        showCSVMessage('두 번째 참조점을 클릭하세요 (SketchUp에서 선택한 두 번째 점과 동일한 위치)');
+    } else {
+        // 두 번째 참조점
+        state.referencePoints.circuitee.p2 = { x, y };
+        
+        // 마커 표시
+        const marker = document.createElement('div');
+        marker.className = 'reference-marker';
+        marker.style.left = (x - 5) + 'px';
+        marker.style.top = (y - 5) + 'px';
+        marker.dataset.ref = '2';
+        dom.elementLayer.appendChild(marker);
+        
+        // 스케일 계산 및 조명 배치
+        calculateScaleAndPlaceLights();
+    }
+}
+
+// 스케일 계산 및 조명 배치
+function calculateScaleAndPlaceLights() {
+    saveState('CSV 조명 가져오기');
+    
+    // SketchUp 참조점 거리 (mm 단위)
+    const sketchupDist = Math.sqrt(
+        Math.pow(state.referencePoints.sketchup.p2.x - state.referencePoints.sketchup.p1.x, 2) +
+        Math.pow(state.referencePoints.sketchup.p2.y - state.referencePoints.sketchup.p1.y, 2)
+    );
+    
+    // Circuitee 참조점 거리 (픽셀 단위)
+    const circuiteeDist = Math.sqrt(
+        Math.pow(state.referencePoints.circuitee.p2.x - state.referencePoints.circuitee.p1.x, 2) +
+        Math.pow(state.referencePoints.circuitee.p2.y - state.referencePoints.circuitee.p1.y, 2)
+    );
+    
+    // 스케일 비율
+    // 실제 측정 결과 2배 크게 나오므로 0.5를 곱함
+    const scale = (circuiteeDist / sketchupDist) * 0.5;
+    
+    // 디버깅을 위한 로그
+    console.log('SketchUp distance:', sketchupDist, 'mm');
+    console.log('Circuitee distance:', circuiteeDist, 'px');
+    console.log('Original scale factor:', circuiteeDist / sketchupDist);
+    console.log('Adjusted scale factor (x0.5):', scale);
+    
+    // 회전 각도 계산 (스케치업의 Y축은 반전)
+    const sketchupAngle = Math.atan2(
+        -(state.referencePoints.sketchup.p2.y - state.referencePoints.sketchup.p1.y),
+        state.referencePoints.sketchup.p2.x - state.referencePoints.sketchup.p1.x
+    );
+    
+    const circuiteeAngle = Math.atan2(
+        state.referencePoints.circuitee.p2.y - state.referencePoints.circuitee.p1.y,
+        state.referencePoints.circuitee.p2.x - state.referencePoints.circuitee.p1.x
+    );
+    
+    let rotation = circuiteeAngle - sketchupAngle;
+    
+    console.log('Original rotation angle (degrees):', rotation * 180 / Math.PI);
+    
+    // 1도 미만의 회전은 무시 (참조점 선택 오차 보정)
+    if (Math.abs(rotation * 180 / Math.PI) < 1.0) {
+        rotation = 0;
+        console.log('Small rotation ignored, set to 0');
+    }
+    
+    // 조명 배치
+    let lightIndex = 0;
+    state.csvData.forEach(lightData => {
+        if (lightData.type === 'light') {
+            // 디버깅: 처음 2개 점조명 좌표 출력
+            if (lightIndex < 2) {
+                console.log(`Point Light ${lightIndex + 1} - SketchUp coords: (${lightData.x}, ${lightData.y}) mm`);
+            }
+            
+            // 점조명 변환 - 스케치업에서 이미 1/2 적용했으므로 원래 스케일 사용
+            const pointScale = (circuiteeDist / sketchupDist); // 원래 스케일
+            const transformed = transformPoint(
+                lightData.x, lightData.y,
+                state.referencePoints.sketchup.p1,
+                state.referencePoints.circuitee.p1,
+                pointScale, rotation
+            );
+            
+            // 디버깅: 변환된 좌표 출력
+            if (lightIndex < 2) {
+                console.log(`Point Light ${lightIndex + 1} - Circuitee coords: (${transformed.x}, ${transformed.y}) px`);
+                console.log(`Point Light ${lightIndex + 1} - Final position: (${transformed.x - 4}, ${transformed.y - 4}) px`);
+            }
+            lightIndex++;
+            
+            // 기존 점조명 추가 로직 활용
+            const label = getNextLightLabel();
+            const element = {
+                id: `element-${state.elementIdCounter++}`,
+                type: 'light',
+                x: Math.round(transformed.x - 4),
+                y: Math.round(transformed.y - 4),
+                state: false,
+                label: label,
+                circuit: null,
+                switchId: null
+            };
+            
+            state.elements.push(element);
+            renderElement(element);
+            
+        } else if (lightData.type === 'linear-light') {
+            // 라인조명 변환 - 원래 스케일 사용 (0.5배 적용 안함)
+            const linearScale = (circuiteeDist / sketchupDist); // 원래 스케일
+            
+            const start = transformPoint(
+                lightData.x1, lightData.y1,
+                state.referencePoints.sketchup.p1,
+                state.referencePoints.circuitee.p1,
+                linearScale, rotation
+            );
+            
+            const end = transformPoint(
+                lightData.x2, lightData.y2,
+                state.referencePoints.sketchup.p1,
+                state.referencePoints.circuitee.p1,
+                linearScale, rotation
+            );
+            
+            // 라인조명 추가
+            addLinearLight(start.x, start.y, end.x, end.y);
+            
+        } else if (lightData.type === 'switch') {
+            // 디버깅
+            console.log(`Switch - SketchUp coords: (${lightData.x}, ${lightData.y}) mm`);
+            
+            // 스위치 변환 - 점조명과 동일한 스케일 사용 (스케치업에서 이미 1/2 적용)
+            const switchScale = (circuiteeDist / sketchupDist); // 원래 스케일
+            const transformed = transformPoint(
+                lightData.x, lightData.y,
+                state.referencePoints.sketchup.p1,
+                state.referencePoints.circuitee.p1,
+                switchScale, rotation
+            );
+            
+            console.log(`Switch - Circuitee coords: (${transformed.x}, ${transformed.y}) px`);
+            console.log(`Switch - Final position: (${transformed.x - 16}, ${transformed.y - 8}) px`);
+            console.log(`Switch - Label: ${getNextSwitchLabel()}`);
+            
+            // 스위치 추가
+            const label = getNextSwitchLabel();
+            // Y 좌표 반올림 (부동소수점 오차 제거)
+            const finalX = Math.round(transformed.x - 16);
+            const finalY = Math.round(transformed.y - 8);
+            
+            const element = {
+                id: `element-${state.elementIdCounter++}`,
+                type: 'switch',
+                x: finalX,
+                y: finalY,
+                state: null,
+                label: label
+            };
+            
+            console.log(`Switch ${label} - Element position: x=${element.x}, y=${element.y}`);
+            
+            state.elements.push(element);
+            renderElement(element);
+        }
+    });
+    
+    // 참조점 마커 제거
+    document.querySelectorAll('.reference-marker').forEach(marker => marker.remove());
+    
+    // CSV 메시지 제거
+    const msgEl = document.querySelector('.csv-message');
+    if (msgEl) msgEl.remove();
+    
+    // 상태 초기화
+    state.csvReferenceMode = false;
+    state.csvData = null;
+    
+    saveToURL();
+}
+
+// 좌표 변환 함수
+function transformPoint(x, y, oldOrigin, newOrigin, scale, rotation) {
+    // 원점 이동
+    const dx = x - oldOrigin.x;
+    const dy = -(y - oldOrigin.y); // Y축 반전 (스케치업의 Y는 위로, circuitee의 Y는 아래로)
+    
+    // 스케일 적용
+    const scaledX = dx * scale;
+    const scaledY = dy * scale;
+    
+    // 회전 적용
+    const rotatedX = scaledX * Math.cos(rotation) - scaledY * Math.sin(rotation);
+    const rotatedY = scaledX * Math.sin(rotation) + scaledY * Math.cos(rotation);
+    
+    // 새 원점으로 이동
+    return {
+        x: rotatedX + newOrigin.x,
+        y: rotatedY + newOrigin.y
+    };
+}
+
+// 다음 조명 라벨 가져오기
+function getNextLightLabel() {
+    const existingNumbers = state.elements
+        .filter(el => el.type === 'light' || el.type === 'linear-light')
+        .map(el => parseInt(el.label.replace('L', '')))
+        .sort((a, b) => a - b);
+    
+    let newNumber = 1;
+    if (existingNumbers.length > 0) {
+        for (let i = 1; i <= existingNumbers[existingNumbers.length - 1] + 1; i++) {
+            if (!existingNumbers.includes(i)) {
+                newNumber = i;
+                break;
+            }
+        }
+    }
+    
+    return `L${newNumber}`;
+}
+
+// CSV 메시지 표시
+function showCSVMessage(message) {
+    // 기존 메시지 제거
+    const existingMsg = document.querySelector('.csv-message');
+    if (existingMsg) existingMsg.remove();
+    
+    // 새 메시지 생성
+    const msgEl = document.createElement('div');
+    msgEl.className = 'csv-message';
+    msgEl.textContent = message;
+    document.body.appendChild(msgEl);
+}
+
+// 다음 스위치 라벨 가져오기
+function getNextSwitchLabel() {
+    const existingNumbers = state.elements
+        .filter(el => el.type === 'switch')
+        .map(el => parseInt(el.label.replace('SW', '')))
+        .sort((a, b) => a - b);
+    
+    let newNumber = 1;
+    if (existingNumbers.length > 0) {
+        for (let i = 1; i <= existingNumbers[existingNumbers.length - 1] + 1; i++) {
+            if (!existingNumbers.includes(i)) {
+                newNumber = i;
+                break;
+            }
+        }
+    }
+    
+    return `SW${newNumber}`;
+}
+
+// 디버깅 함수: 모든 스위치의 Y 좌표 출력
+function debugSwitchPositions() {
+    const switches = state.elements.filter(el => el.type === 'switch');
+    console.log('=== All Switch Positions ===');
+    switches.forEach((sw, index) => {
+        const domEl = document.getElementById(sw.id);
+        if (domEl) {
+            const rect = domEl.getBoundingClientRect();
+            console.log(`${sw.label}: state.y=${sw.y}, DOM.style.top=${domEl.style.top}, offsetTop=${domEl.offsetTop}, getBoundingClientRect.top=${rect.top}`);
+        }
+    });
+    
+    // Y 좌표 차이 확인
+    if (switches.length > 1) {
+        console.log('\n=== Y Coordinate Differences ===');
+        for (let i = 1; i < switches.length; i++) {
+            const diff = switches[i].y - switches[i-1].y;
+            console.log(`${switches[i].label} - ${switches[i-1].label}: ${diff}px`);
+        }
+    }
+}
+
+// window에 노출 (브라우저 콘솔에서 호출 가능)
+window.debugSwitchPositions = debugSwitchPositions;
 
 // 시작
 document.addEventListener('DOMContentLoaded', init);
