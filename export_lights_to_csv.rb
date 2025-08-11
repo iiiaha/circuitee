@@ -224,10 +224,14 @@ module CircuiteeLightExporter
         update_status
       elsif @ref_point2.nil?
         @ref_point2 = @ip.position
+        
+        # Pop tool first
         Sketchup.active_model.tools.pop_tool
         
-        # Now export to CSV
-        CircuiteeLightExporter.export_to_csv(@point_lights, @linear_lights, @switches, @ref_point1, @ref_point2)
+        # Delay export to avoid crash
+        UI.start_timer(0.1, false) {
+          CircuiteeLightExporter.export_to_csv(@point_lights, @linear_lights, @switches, @ref_point1, @ref_point2)
+        }
       end
       view.invalidate
     end
@@ -249,6 +253,19 @@ module CircuiteeLightExporter
     
     def update_status
       Sketchup.status_text = @current_prompt
+    end
+    
+    def deactivate(view)
+      view.invalidate
+    end
+    
+    def onCancel(reason, view)
+      Sketchup.active_model.tools.pop_tool
+      view.invalidate
+    end
+    
+    def resume(view)
+      view.invalidate
     end
   end
   
