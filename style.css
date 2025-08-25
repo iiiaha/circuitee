@@ -345,7 +345,6 @@ body {
 
 /* 3로 스위치 표시 */
 .element.switch.three-way {
-    position: relative;
     border-color: #ff6b6b;
 }
 
