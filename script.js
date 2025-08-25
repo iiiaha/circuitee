@@ -709,9 +709,15 @@ function getCircuitColor(circuitId) {
 // 스위치의 구수 계산
 function calculateSwitchGang(switchId) {
     // 이 스위치에 연결된 모든 조명 찾기
-    const connectedLights = state.elements.filter(el => 
-        (el.type === 'light' || el.type === 'linear-light') && el.switchId === switchId
-    );
+    const connectedLights = state.elements.filter(el => {
+        if (el.type !== 'light' && el.type !== 'linear-light') return false;
+        // 새로운 switchIds 배열 확인
+        if (el.switchIds) {
+            return el.switchIds.includes(switchId);
+        }
+        // 기존 switchId 속성도 확인 (하위 호환성)
+        return el.switchId === switchId;
+    });
     
     // 연결된 조명들의 회로를 중복 없이 수집
     const uniqueCircuits = new Set();
