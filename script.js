@@ -789,9 +789,24 @@ function selectElement(elementId) {
             // 스위치 정보
             const switchRow = document.createElement('div');
             switchRow.className = 'element-info-row';
-            const switchData = elementData.switchId ? 
-                state.elements.find(el => el.id === elementData.switchId) : null;
-            const switchText = switchData ? switchData.label : '없음';
+            
+            // 연결된 스위치 찾기 (switchIds 배열 또는 switchId 속성)
+            let switchTexts = [];
+            if (elementData.switchIds && elementData.switchIds.length > 0) {
+                elementData.switchIds.forEach(swId => {
+                    const switchData = state.elements.find(el => el.id === swId);
+                    if (switchData) {
+                        switchTexts.push(switchData.label || 'SW');
+                    }
+                });
+            } else if (elementData.switchId) {
+                const switchData = state.elements.find(el => el.id === elementData.switchId);
+                if (switchData) {
+                    switchTexts.push(switchData.label || 'SW');
+                }
+            }
+            
+            const switchText = switchTexts.length > 0 ? switchTexts.join(', ') : '없음';
             switchRow.innerHTML = `
                 <span class="element-info-label">스위치:</span>
                 <span class="element-info-value">${switchText}</span>
