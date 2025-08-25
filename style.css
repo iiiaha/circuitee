@@ -343,6 +343,29 @@ body {
     box-shadow: 0 0 0 2px rgba(92, 124, 250, 0.3);
 }
 
+/* 3로 스위치 표시 */
+.element.switch.three-way {
+    position: relative;
+    border-color: #ff6b6b;
+}
+
+.three-way-indicator {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 14px;
+    height: 14px;
+    background: #ff6b6b;
+    color: white;
+    border-radius: 50%;
+    font-size: 0.5rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #1e1e1e;
+}
+
 .element.light {
     width: 8px;
     height: 8px;

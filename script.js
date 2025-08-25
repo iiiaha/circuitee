@@ -16,7 +16,8 @@ let state = {
     csvImportMode: false, // CSV 가져오기 모드
     csvData: null, // CSV 데이터 임시 저장
     referencePoints: [], // 참조점 [sketchup: {p1, p2}, circuitee: {p1, p2}]
-    csvReferenceMode: false // 참조점 선택 모드
+    csvReferenceMode: false, // 참조점 선택 모드
+    switchStates: {} // 3로 스위치를 위한 스위치별 회로별 상태 {switchId: {circuitId: boolean}}
 };
 
 // Undo/Redo 스택
@@ -539,6 +540,42 @@ function renderElement(element) {
     
     if (element.type === 'switch') {
         div.textContent = element.label || 'SW';
+        
+        // 3로 스위치 표시: 이 스위치에 연결된 회로 확인
+        const connectedCircuits = getSwitchCircuits(element.id);
+        if (connectedCircuits.length > 0) {
+            // 각 회로에 연결된 스위치 개수 확인
+            let is3Way = false;
+            connectedCircuits.forEach(circuitId => {
+                const circuitLights = state.elements.filter(el => 
+                    (el.type === 'light' || el.type === 'linear-light') && 
+                    el.circuit === circuitId
+                );
+                
+                // 회로에 연결된 스위치 수 계산
+                const connectedSwitches = new Set();
+                circuitLights.forEach(light => {
+                    if (light.switchIds && light.switchIds.length > 0) {
+                        light.switchIds.forEach(swId => connectedSwitches.add(swId));
+                    } else if (light.switchId) {
+                        connectedSwitches.add(light.switchId);
+                    }
+                });
+                
+                if (connectedSwitches.size > 1) {
+                    is3Way = true;
+                }
+            });
+            
+            // 3로 스위치면 특별한 표시 추가
+            if (is3Way) {
+                div.classList.add('three-way');
+                const indicator = document.createElement('span');
+                indicator.className = 'three-way-indicator';
+                indicator.textContent = '3';
+                div.appendChild(indicator);
+            }
+        }
     } else if (element.type === 'light') {
         // 조명은 이제 텍스트 없이 CSS로만 표현
         if (element.state) {
@@ -690,9 +727,15 @@ function calculateSwitchGang(switchId) {
 // 스위치에 연결된 회로들 가져오기
 function getSwitchCircuits(switchId) {
     // 이 스위치에 연결된 모든 조명 찾기
-    const connectedLights = state.elements.filter(el => 
-        (el.type === 'light' || el.type === 'linear-light') && el.switchId === switchId
-    );
+    const connectedLights = state.elements.filter(el => {
+        if (el.type !== 'light' && el.type !== 'linear-light') return false;
+        // 새로운 switchIds 배열 확인
+        if (el.switchIds) {
+            return el.switchIds.includes(switchId);
+        }
+        // 기존 switchId 속성도 확인 (하위 호환성)
+        return el.switchId === switchId;
+    });
     
     // 연결된 조명들의 회로를 중복 없이 수집
     const uniqueCircuits = new Set();
@@ -860,16 +903,22 @@ function connectLights(light1, light2) {
         if (!state.circuits[light1.circuit].includes(light2.id)) {
             state.circuits[light1.circuit].push(light2.id);
         }
-        // light1의 스위치 속성을 light2도 공유
-        light2.switchId = light1.switchId;
+        // light1의 스위치 속성을 light2도 공유 (3로 스위치 지원)
+        if (light1.switchIds) {
+            light2.switchIds = [...light1.switchIds];
+        } else if (light1.switchId) {
+            light2.switchIds = [light1.switchId];
+        }
         
         // 같은 회로의 모든 조명에 스위치 속성 전파
-        if (light1.switchId) {
+        const switchIds = light1.switchIds || (light1.switchId ? [light1.switchId] : []);
+        if (switchIds.length > 0) {
             const circuitLights = state.circuits[light1.circuit];
             circuitLights.forEach(lightId => {
                 const light = state.elements.find(el => el.id === lightId);
                 if (light) {
-                    light.switchId = light1.switchId;
+                    light.switchIds = [...switchIds];
+                    delete light.switchId; // 기존 속성 제거
                 }
             });
         }
@@ -879,16 +928,22 @@ function connectLights(light1, light2) {
         if (!state.circuits[light2.circuit].includes(light1.id)) {
             state.circuits[light2.circuit].push(light1.id);
         }
-        // light2의 스위치 속성을 light1도 공유
-        light1.switchId = light2.switchId;
+        // light2의 스위치 속성을 light1도 공유 (3로 스위치 지원)
+        if (light2.switchIds) {
+            light1.switchIds = [...light2.switchIds];
+        } else if (light2.switchId) {
+            light1.switchIds = [light2.switchId];
+        }
         
         // 같은 회로의 모든 조명에 스위치 속성 전파
-        if (light2.switchId) {
+        const switchIds = light2.switchIds || (light2.switchId ? [light2.switchId] : []);
+        if (switchIds.length > 0) {
             const circuitLights = state.circuits[light2.circuit];
             circuitLights.forEach(lightId => {
                 const light = state.elements.find(el => el.id === lightId);
                 if (light) {
-                    light.switchId = light2.switchId;
+                    light.switchIds = [...switchIds];
+                    delete light.switchId; // 기존 속성 제거
                 }
             });
         }
@@ -899,11 +954,15 @@ function connectLights(light1, light2) {
         light2.circuit = newCircuitId;
         state.circuits[newCircuitId] = [light1.id, light2.id];
         
-        // 스위치 속성도 공유
-        const switchId = light1.switchId || light2.switchId;
-        if (switchId) {
-            light1.switchId = switchId;
-            light2.switchId = switchId;
+        // 스위치 속성도 공유 (3로 스위치 지원)
+        const switchIds = light1.switchIds || light2.switchIds || 
+                        (light1.switchId ? [light1.switchId] : null) || 
+                        (light2.switchId ? [light2.switchId] : null);
+        if (switchIds) {
+            light1.switchIds = [...switchIds];
+            light2.switchIds = [...switchIds];
+            delete light1.switchId;
+            delete light2.switchId;
         }
     }
     
@@ -947,14 +1006,17 @@ function connectLightToSwitch(element1, element2) {
         circuitLights.forEach(lightId => {
             const circuitLight = state.elements.find(el => el.id === lightId);
             if (circuitLight) {
-                // 기존 스위치 연결 제거 (시각적 연결선만)
-                if (circuitLight.switchId && circuitLight.switchId !== switchEl.id) {
-                    state.connections = state.connections.filter(
-                        conn => !(conn.from === lightId && conn.to === circuitLight.switchId) &&
-                                !(conn.to === lightId && conn.from === circuitLight.switchId)
-                    );
+                // 3로 스위치 지원: switchIds 배열로 관리
+                if (!circuitLight.switchIds) {
+                    // 기존 switchId를 배열로 변환
+                    circuitLight.switchIds = circuitLight.switchId ? [circuitLight.switchId] : [];
+                    delete circuitLight.switchId; // 기존 속성 제거
                 }
-                circuitLight.switchId = switchEl.id;
+                
+                // 새 스위치를 배열에 추가 (중복 방지)
+                if (!circuitLight.switchIds.includes(switchEl.id)) {
+                    circuitLight.switchIds.push(switchEl.id);
+                }
             }
         });
         
@@ -977,51 +1039,57 @@ function mergeCircuits(circuit1, circuit2) {
     const lights1 = state.circuits[circuit1] || [];
     const lights2 = state.circuits[circuit2] || [];
     
-    let switchId1 = null;
-    let switchId2 = null;
+    let switchIds1 = [];
+    let switchIds2 = [];
     
-    // circuit1의 스위치 찾기
+    // circuit1의 모든 스위치 수집
     for (const lightId of lights1) {
         const light = state.elements.find(el => el.id === lightId);
-        if (light && light.switchId) {
-            switchId1 = light.switchId;
-            break;
+        if (light) {
+            if (light.switchIds) {
+                switchIds1 = [...new Set([...switchIds1, ...light.switchIds])];
+            } else if (light.switchId) {
+                switchIds1 = [...new Set([...switchIds1, light.switchId])];
+            }
         }
     }
     
-    // circuit2의 스위치 찾기
+    // circuit2의 모든 스위치 수집
     for (const lightId of lights2) {
         const light = state.elements.find(el => el.id === lightId);
-        if (light && light.switchId) {
-            switchId2 = light.switchId;
-            break;
+        if (light) {
+            if (light.switchIds) {
+                switchIds2 = [...new Set([...switchIds2, ...light.switchIds])];
+            } else if (light.switchId) {
+                switchIds2 = [...new Set([...switchIds2, light.switchId])];
+            }
         }
     }
     
-    // 병합할 스위치 결정 (circuit1의 스위치를 우선)
-    const finalSwitchId = switchId1 || switchId2;
+    // 병합할 스위치들 결정 (두 회로의 모든 스위치를 합침)
+    const finalSwitchIds = [...new Set([...switchIds1, ...switchIds2])];
     
     // circuit2의 모든 조명을 circuit1로 이동
     lights2.forEach(lightId => {
         const light = state.elements.find(el => el.id === lightId);
         if (light) {
             light.circuit = circuit1;
-            light.switchId = finalSwitchId;
+            light.switchIds = finalSwitchIds.length > 0 ? [...finalSwitchIds] : [];
+            delete light.switchId; // 기존 속성 제거
             if (!state.circuits[circuit1].includes(lightId)) {
                 state.circuits[circuit1].push(lightId);
             }
         }
     });
     
-    // circuit1의 모든 조명에도 스위치 속성 적용
-    if (finalSwitchId) {
-        lights1.forEach(lightId => {
-            const light = state.elements.find(el => el.id === lightId);
-            if (light) {
-                light.switchId = finalSwitchId;
-            }
-        });
-    }
+    // circuit1의 모든 조명에도 병합된 스위치 속성 적용
+    lights1.forEach(lightId => {
+        const light = state.elements.find(el => el.id === lightId);
+        if (light) {
+            light.switchIds = finalSwitchIds.length > 0 ? [...finalSwitchIds] : [];
+            delete light.switchId; // 기존 속성 제거
+        }
+    });
     
     // circuit2 삭제
     delete state.circuits[circuit2];
@@ -1260,16 +1328,14 @@ function handleSwitchClick(e, switchData) {
         // 회로 번호만 추출 (c1 -> 1)
         toggleBtn.dataset.circuitNum = circuitId.replace('c', '');
         
-        // 현재 회로의 조명 상태 확인
-        const circuitLights = state.elements.filter(el => 
-            (el.type === 'light' || el.type === 'linear-light') && 
-            el.switchId === switchData.id && 
-            el.circuit === circuitId
-        );
+        // 스위치 상태 초기화 (없으면 생성)
+        if (!state.switchStates[switchData.id]) {
+            state.switchStates[switchData.id] = {};
+        }
         
-        // 하나라도 켜져있으면 active
-        const isActive = circuitLights.some(light => light.state);
-        if (isActive) {
+        // 현재 스위치의 해당 회로에 대한 상태 확인
+        const switchState = state.switchStates[switchData.id][circuitId] || false;
+        if (switchState) {
             toggleBtn.classList.add('active');
         }
         
@@ -1285,25 +1351,53 @@ function handleSwitchClick(e, switchData) {
     document.body.appendChild(toggleContainer);
 }
 
-// 회로별 토글 처리
+// 회로별 토글 처리 (3로 스위치 지원)
 function handleCircuitToggle(switchId, circuitId, toggleBtn) {
+    // 스위치 상태 초기화
+    if (!state.switchStates[switchId]) {
+        state.switchStates[switchId] = {};
+    }
+    
     // 토글 버튼 상태 변경
     toggleBtn.classList.toggle('active');
-    const isActive = toggleBtn.classList.contains('active');
+    const isSwitchActive = toggleBtn.classList.contains('active');
     
-    // 해당 회로의 조명들만 토글
+    // 스위치 상태 저장
+    state.switchStates[switchId][circuitId] = isSwitchActive;
+    
+    // 해당 회로에 연결된 모든 스위치의 상태를 확인하여 조명 상태 결정
     const circuitLights = state.elements.filter(el => 
         (el.type === 'light' || el.type === 'linear-light') && 
-        el.switchId === switchId && 
         el.circuit === circuitId
     );
     
-    // 연결된 조명 토글
+    // 회로에 연결된 모든 스위치 찾기
+    const circuitSwitches = new Set();
+    circuitLights.forEach(light => {
+        if (light.switchIds && light.switchIds.length > 0) {
+            light.switchIds.forEach(swId => circuitSwitches.add(swId));
+        } else if (light.switchId) {
+            circuitSwitches.add(light.switchId);
+        }
+    });
+    
+    // 3로 스위치 로직: 켜진 스위치 개수가 홀수면 조명 켜짐
+    let activeSwitchCount = 0;
+    circuitSwitches.forEach(swId => {
+        if (state.switchStates[swId] && state.switchStates[swId][circuitId]) {
+            activeSwitchCount++;
+        }
+    });
+    
+    // 조명 상태 결정 (홀수개의 스위치가 켜져있으면 조명 켜짐)
+    const shouldLightsBeOn = activeSwitchCount % 2 === 1;
+    
+    // 조명 상태 업데이트
     circuitLights.forEach(lightData => {
         const lightEl = document.getElementById(lightData.id);
         if (lightEl) {
-            lightData.state = isActive;
-            lightEl.classList.toggle('on', isActive);
+            lightData.state = shouldLightsBeOn;
+            lightEl.classList.toggle('on', shouldLightsBeOn);
         }
     });
 }
@@ -1319,6 +1413,17 @@ function toggleMode() {
     
     // 회로 토글 버튼 제거
     document.querySelectorAll('.circuit-toggles').forEach(el => el.remove());
+    
+    // 테스트 모드로 전환 시 스위치 상태 초기화
+    if (state.mode === 'test') {
+        state.switchStates = {};
+        // 모든 조명 끄기
+        state.elements.forEach(el => {
+            if (el.type === 'light' || el.type === 'linear-light') {
+                el.state = false;
+            }
+        });
+    }
     
     // 도구 선택 해제
     selectTool(null);
