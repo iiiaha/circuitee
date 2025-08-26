@@ -42,7 +42,10 @@ const dom = {
     closeModal: null,
     clearBtn: null,
     deleteBtn: null,
-    connectBtn: null
+    connectBtn: null,
+    saveProjectBtn: null,
+    loadProjectBtn: null,
+    projectFileInput: null
 };
 
 // 초기화
@@ -73,6 +76,9 @@ function initDOM() {
     dom.connectBtn = document.getElementById('connectBtn');
     dom.undoBtn = document.getElementById('undoBtn');
     dom.redoBtn = document.getElementById('redoBtn');
+    dom.saveProjectBtn = document.getElementById('saveProjectBtn');
+    dom.loadProjectBtn = document.getElementById('loadProjectBtn');
+    dom.projectFileInput = document.getElementById('projectFileInput');
 }
 
 // 이벤트 리스너 설정
@@ -124,6 +130,11 @@ function setupEventListeners() {
             dom.shareModal.hidden = true;
         }
     });
+    
+    // 프로젝트 저장/불러오기
+    dom.saveProjectBtn.addEventListener('click', saveProject);
+    dom.loadProjectBtn.addEventListener('click', () => dom.projectFileInput.click());
+    dom.projectFileInput.addEventListener('change', loadProject);
     
     
     // 초기화
@@ -1679,6 +1690,92 @@ function copyShareURL() {
     } catch (e) {
         alert('복사에 실패했습니다. 수동으로 복사해주세요.');
     }
+}
+
+// 프로젝트 저장
+function saveProject() {
+    try {
+        // 전체 상태를 JSON으로 저장
+        const projectData = {
+            version: '1.0',
+            timestamp: new Date().toISOString(),
+            state: {
+                elements: state.elements,
+                connections: state.connections,
+                circuits: state.circuits,
+                circuitCounter: state.circuitCounter,
+                floorPlan: state.floorPlan,
+                circuitColors: state.circuitColors,
+                elementIdCounter: state.elementIdCounter,
+                switchStates: state.switchStates
+            }
+        };
+        
+        // JSON을 Blob으로 변환
+        const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
+        
+        // 다운로드 링크 생성
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `circuitee_project_${new Date().toISOString().slice(0, 10)}.circuitee`;
+        
+        // 클릭하여 다운로드
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        alert('프로젝트가 저장되었습니다.');
+    } catch (e) {
+        console.error('Failed to save project:', e);
+        alert('프로젝트 저장에 실패했습니다.');
+    }
+}
+
+// 프로젝트 불러오기
+function loadProject(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const projectData = JSON.parse(e.target.result);
+            
+            // 버전 확인
+            if (!projectData.version || !projectData.state) {
+                throw new Error('Invalid project file format');
+            }
+            
+            // 현재 상태 저장 (실행 취소용)
+            saveState('프로젝트 불러오기');
+            
+            // 상태 복원
+            const loadedState = projectData.state;
+            state.elements = loadedState.elements || [];
+            state.connections = loadedState.connections || [];
+            state.circuits = loadedState.circuits || {};
+            state.circuitCounter = loadedState.circuitCounter || 1;
+            state.floorPlan = loadedState.floorPlan || null;
+            state.circuitColors = loadedState.circuitColors || {};
+            state.elementIdCounter = loadedState.elementIdCounter || 1;
+            state.switchStates = loadedState.switchStates || {};
+            
+            // 화면 새로고침
+            renderAll();
+            saveToURL();
+            
+            alert(`프로젝트를 불러왔습니다.\n저장 날짜: ${new Date(projectData.timestamp).toLocaleString()}`);
+        } catch (error) {
+            console.error('Failed to load project:', error);
+            alert('프로젝트 파일을 읽을 수 없습니다.');
+        }
+    };
+    
+    reader.readAsText(file);
+    // 파일 입력 초기화
+    event.target.value = '';
 }
 
 // 전체 초기화
