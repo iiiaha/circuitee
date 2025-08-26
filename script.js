@@ -45,7 +45,8 @@ const dom = {
     connectBtn: null,
     saveProjectBtn: null,
     loadProjectBtn: null,
-    projectFileInput: null
+    projectFileInput: null,
+    urlBtn: null
 };
 
 // 초기화
@@ -79,6 +80,7 @@ function initDOM() {
     dom.saveProjectBtn = document.getElementById('saveProjectBtn');
     dom.loadProjectBtn = document.getElementById('loadProjectBtn');
     dom.projectFileInput = document.getElementById('projectFileInput');
+    dom.urlBtn = document.getElementById('urlBtn');
 }
 
 // 이벤트 리스너 설정
@@ -86,6 +88,9 @@ function setupEventListeners() {
     // 파일 업로드
     dom.uploadBtn.addEventListener('click', () => dom.fileInput.click());
     dom.fileInput.addEventListener('change', handleFileUpload);
+    
+    // URL로 평면도 불러오기
+    dom.urlBtn.addEventListener('click', handleUrlUpload);
     
     // CSV 업로드
     dom.csvUploadBtn.addEventListener('click', () => dom.csvInput.click());
@@ -219,9 +224,43 @@ function processImageFile(file) {
 function displayFloorPlan() {
     if (state.floorPlan) {
         dom.floorPlanLayer.innerHTML = `<img src="${state.floorPlan}" alt="평면도">`;
+    } else if (state.floorPlanUrl) {
+        dom.floorPlanLayer.innerHTML = `<img src="${state.floorPlanUrl}" alt="평면도" crossorigin="anonymous">`;
     } else {
         dom.floorPlanLayer.innerHTML = '';
     }
+}
+
+// URL로 평면도 불러오기
+function handleUrlUpload() {
+    const url = prompt('GitHub에 업로드한 평면도 이미지 URL을 입력하세요.\n예: https://raw.githubusercontent.com/iiiaha/circuitee/master/images/floorplans/floor.jpg');
+    
+    if (!url) return;
+    
+    // GitHub raw URL 또는 다른 이미지 URL 확인
+    if (!url.match(/\.(jpg|jpeg|png|gif)$/i)) {
+        alert('이미지 파일 URL을 입력해주세요. (.jpg, .jpeg, .png, .gif)');
+        return;
+    }
+    
+    // 이미지 로드 테스트
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    
+    img.onload = () => {
+        state.floorPlanUrl = url;
+        state.floorPlan = null; // Base64는 제거
+        displayFloorPlan();
+        saveState('평면도 URL 로드');
+        saveToURL();
+        alert('평면도가 로드되었습니다.');
+    };
+    
+    img.onerror = () => {
+        alert('이미지를 불러올 수 없습니다.\nURL이 올바른지 확인해주세요.');
+    };
+    
+    img.src = url;
 }
 
 // 도구 선택
@@ -1557,7 +1596,8 @@ function saveToURL() {
         
         const stateToSave = {
             ...state,
-            floorPlan: includeFloorPlan ? state.floorPlan : (state.floorPlan ? 'has-floorplan' : null)
+            floorPlan: includeFloorPlan ? state.floorPlan : (state.floorPlan ? 'has-floorplan' : null),
+            floorPlanUrl: state.floorPlanUrl // URL은 항상 포함
         };
         
         const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(stateToSave));
@@ -1737,6 +1777,7 @@ function saveProject() {
                 circuits: state.circuits,
                 circuitCounter: state.circuitCounter,
                 floorPlan: state.floorPlan,
+                floorPlanUrl: state.floorPlanUrl,
                 circuitColors: state.circuitColors,
                 elementIdCounter: state.elementIdCounter,
                 switchStates: state.switchStates
@@ -1790,6 +1831,7 @@ function loadProject(event) {
             state.circuits = loadedState.circuits || {};
             state.circuitCounter = loadedState.circuitCounter || 1;
             state.floorPlan = loadedState.floorPlan || null;
+            state.floorPlanUrl = loadedState.floorPlanUrl || null;
             state.circuitColors = loadedState.circuitColors || {};
             state.elementIdCounter = loadedState.elementIdCounter || 1;
             state.switchStates = loadedState.switchStates || {};
