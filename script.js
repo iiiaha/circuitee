@@ -627,6 +627,59 @@ function handleElementClick(e, elementData) {
     selectElement(elementData.id);
 }
 
+// 회로에서 조명 제거
+function removeCircuitFromLights(circuitId) {
+    saveState('회로 삭제');
+    
+    // 해당 회로의 모든 조명 찾기
+    const circuitLights = state.elements.filter(el => 
+        (el.type === 'light' || el.type === 'linear-light') && el.circuit === circuitId
+    );
+    
+    // 각 조명에서 회로 정보 제거
+    circuitLights.forEach(light => {
+        light.circuit = null;
+        // 스위치 정보도 제거
+        light.switchIds = [];
+        delete light.switchId;
+    });
+    
+    // 회로 정보 삭제
+    delete state.circuits[circuitId];
+    delete state.circuitColors[circuitId];
+    
+    // 해당 회로의 모든 연결선 제거 (회로 연결만, 스위치 연결도 포함)
+    state.connections = state.connections.filter(conn => {
+        // 회로 연결인 경우
+        if (conn.type === 'circuit') {
+            const fromEl = state.elements.find(el => el.id === conn.from);
+            const toEl = state.elements.find(el => el.id === conn.to);
+            // 둘 다 같은 회로였던 경우 제거
+            return !(circuitLights.some(light => light.id === conn.from || light.id === conn.to));
+        }
+        // 스위치 연결인 경우
+        if (conn.type === 'control') {
+            // 이 회로의 조명과 연결된 스위치 연결 제거
+            return !circuitLights.some(light => light.id === conn.from || light.id === conn.to);
+        }
+        return true;
+    });
+    
+    // 화면 업데이트
+    redrawConnections();
+    saveToURL();
+    
+    // 정보 팝업 닫기
+    document.querySelectorAll('.element-info-container').forEach(container => {
+        container.remove();
+    });
+    
+    // 선택 해제
+    document.querySelectorAll('.element.selected').forEach(el => {
+        el.classList.remove('selected');
+    });
+}
+
 // 요소 삭제
 function deleteElement(elementId) {
     saveState('요소 삭제');
@@ -785,6 +838,18 @@ function selectElement(elementId) {
                 <span class="element-info-value">${elementData.circuit || '없음'}</span>
             `;
             infoContainer.appendChild(circuitRow);
+            
+            // 회로 삭제 버튼 (회로가 있는 경우만)
+            if (elementData.circuit) {
+                const removeCircuitBtn = document.createElement('button');
+                removeCircuitBtn.className = 'element-info-remove-circuit';
+                removeCircuitBtn.textContent = '회로 삭제';
+                removeCircuitBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    removeCircuitFromLights(elementData.circuit);
+                };
+                infoContainer.appendChild(removeCircuitBtn);
+            }
             
             // 스위치 정보
             const switchRow = document.createElement('div');

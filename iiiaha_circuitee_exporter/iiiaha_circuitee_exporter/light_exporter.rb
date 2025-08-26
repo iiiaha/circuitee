@@ -7,6 +7,21 @@ module Iiiaha
   module CircuiteeExporter
     module LightExporter
     
+    # Helper method to recursively collect all component instances including those in groups
+    def self.collect_instances_recursively(entities, parent_transformation, result_array)
+      entities.each do |entity|
+        if entity.is_a?(Sketchup::ComponentInstance)
+          # Accumulate transformation
+          accumulated_trans = parent_transformation * entity.transformation
+          result_array << {instance: entity, transformation: accumulated_trans}
+        elsif entity.is_a?(Sketchup::Group)
+          # Recursively process group contents
+          accumulated_trans = parent_transformation * entity.transformation
+          collect_instances_recursively(entity.entities, accumulated_trans, result_array)
+        end
+      end
+    end
+    
     def self.export_lights
       model = Sketchup.active_model
       
@@ -26,155 +41,112 @@ module Iiiaha
       puts "\n=== Scanning for D5 Lights ==="
       puts "Total definitions in model: #{model.definitions.length}"
       
-      # Find all component instances
-      model.definitions.each do |definition|
-        # Skip if no instances
-        next if definition.instances.empty?
+      # Recursively find all instances including those in groups
+      all_instances = []
+      collect_instances_recursively(model.entities, Geom::Transformation.new, all_instances)
+      
+      puts "Found #{all_instances.length} total instances (including nested)"
+      
+      # Process each instance with its accumulated transformation
+      all_instances.each do |instance_data|
+        instance = instance_data[:instance]
+        global_trans = instance_data[:transformation]
+        definition = instance.definition
         
         # Debug: Show definition names
         if definition.name.downcase.include?("d5") || definition.name.downcase.include?("light")
-          puts "Found potential light definition: '#{definition.name}'"
+          puts "Found potential light: '#{definition.name}'"
         end
         
         # Check if this is a light component (includes numbered versions)
         if definition.name == "D5RenderLight.Spot" || definition.name.start_with?("D5RenderLight.Spot#")
           # Point light
-          puts "  -> Processing #{definition.instances.length} Spot light instances"
+          puts "  -> Processing Spot light (#{instance.parent.class})"
           
-          # Debug: Check definition size
+          # Get the center point of the component bounds in definition space
           def_bounds = definition.bounds
-          puts "    Definition bounds: #{def_bounds.width.to_mm.round(2)} x #{def_bounds.height.to_mm.round(2)} x #{def_bounds.depth.to_mm.round(2)} mm"
+          center = def_bounds.center
           
-          definition.instances.each_with_index do |instance, idx|
-            # Get transformation origin (insertion point)
-            insertion_point = instance.transformation.origin
-            
-            # Get the center point of the component
-            bounds = instance.bounds
-            center = bounds.center
-            
-            # Transform to global coordinates
-            global_center = instance.transformation * center
-            
-            puts "    Instance #{idx + 1}:"
-            puts "      Insertion point: (#{insertion_point.x.to_mm.round(2)}, #{insertion_point.y.to_mm.round(2)}, #{insertion_point.z.to_mm.round(2)}) mm"
-            
-            # Convert to mm - SketchUp internal units are inches
-            # 스케치업 좌표가 2배로 나오므로 1/2 적용
-            point_lights << {
-              type: "point",
-              x: global_center.x.to_mm / 2.0,
-              y: global_center.y.to_mm / 2.0,
-              z: global_center.z.to_mm / 2.0,
-              name: instance.name.empty? ? "Light_#{point_lights.length + 1}" : instance.name
-            }
-            
-            puts "    Point light at: (#{global_center.x.to_mm.round(2)}, #{global_center.y.to_mm.round(2)}, #{global_center.z.to_mm.round(2)}) mm"
-            puts "      Raw position: (#{global_center.x.round(2)}, #{global_center.y.round(2)}, #{global_center.z.round(2)}) inches"
-          end
+          # Transform to global coordinates using accumulated transformation
+          global_center = global_trans * center
+          
+          puts "    Global transformation applied"
+          puts "    Definition center: (#{center.x.to_mm.round(2)}, #{center.y.to_mm.round(2)}, #{center.z.to_mm.round(2)}) mm"
+          puts "    Global center: (#{global_center.x.to_mm.round(2)}, #{global_center.y.to_mm.round(2)}, #{global_center.z.to_mm.round(2)}) mm"
+          
+          # Convert to mm - SketchUp internal units are inches
+          point_lights << {
+            type: "point",
+            x: global_center.x.to_mm,
+            y: global_center.y.to_mm,
+            z: global_center.z.to_mm,
+            name: instance.name.empty? ? "Light_#{point_lights.length + 1}" : instance.name
+          }
           
         elsif definition.name == "D5RenderLight.Strip" || definition.name.start_with?("D5RenderLight.Strip#")
           # Linear light
-          puts "  -> Processing #{definition.instances.length} Strip light instances"
-          definition.instances.each do |instance|
-            # Get transformation info
-            transform = instance.transformation
-            origin = transform.origin
-            puts "    Instance transformation:"
-            puts "      Origin: (#{origin.x.to_mm.round(2)}, #{origin.y.to_mm.round(2)}, #{origin.z.to_mm.round(2)}) mm"
-            puts "      X-axis: #{transform.xaxis.inspect}"
-            puts "      Y-axis: #{transform.yaxis.inspect}"
-            puts "      Z-axis: #{transform.zaxis.inspect}"
-            
-            # Get the bounding box
-            bounds = instance.bounds
-            
-            # Get definition bounds for correct dimensions
-            def_bounds = instance.definition.bounds
-            
-            # Calculate start and end points in definition coordinates
-            width = def_bounds.width
-            height = def_bounds.height
-            depth = def_bounds.depth
-            
-            # Find the longest dimension
-            if width >= height && width >= depth
-              # Light extends along X axis
-              start_point = Geom::Point3d.new(def_bounds.min.x, def_bounds.center.y, def_bounds.center.z)
-              end_point = Geom::Point3d.new(def_bounds.max.x, def_bounds.center.y, def_bounds.center.z)
-            elsif height >= width && height >= depth
-              # Light extends along Y axis
-              start_point = Geom::Point3d.new(def_bounds.center.x, def_bounds.min.y, def_bounds.center.z)
-              end_point = Geom::Point3d.new(def_bounds.center.x, def_bounds.max.y, def_bounds.center.z)
-            else
-              # Light extends along Z axis
-              start_point = Geom::Point3d.new(def_bounds.center.x, def_bounds.center.y, def_bounds.min.z)
-              end_point = Geom::Point3d.new(def_bounds.center.x, def_bounds.center.y, def_bounds.max.z)
-            end
-            
-            # Transform to global coordinates
-            global_start = instance.transformation * start_point
-            global_end = instance.transformation * end_point
-            
-            linear_lights << {
-              type: "linear",
-              x1: global_start.x.to_mm,
-              y1: global_start.y.to_mm,
-              z1: global_start.z.to_mm,
-              x2: global_end.x.to_mm,
-              y2: global_end.y.to_mm,
-              z2: global_end.z.to_mm,
-              name: instance.name.empty? ? "LinearLight_#{linear_lights.length + 1}" : instance.name
-            }
-            
-            puts "    Strip light:"
-            puts "      Instance bounds: width=#{bounds.width.to_mm.round(2)}mm, height=#{bounds.height.to_mm.round(2)}mm"
-            puts "      Definition bounds: width=#{def_bounds.width.to_mm.round(2)}mm, height=#{def_bounds.height.to_mm.round(2)}mm, depth=#{def_bounds.depth.to_mm.round(2)}mm"
-            puts "      Longest axis: #{width >= height && width >= depth ? 'X' : (height >= width && height >= depth ? 'Y' : 'Z')}"
-            puts "      Definition start: (#{start_point.x.to_mm.round(2)}, #{start_point.y.to_mm.round(2)}, #{start_point.z.to_mm.round(2)}) mm"
-            puts "      Definition end: (#{end_point.x.to_mm.round(2)}, #{end_point.y.to_mm.round(2)}, #{end_point.z.to_mm.round(2)}) mm"
-            puts "      Global start: (#{global_start.x.to_mm.round(2)}, #{global_start.y.to_mm.round(2)}, #{global_start.z.to_mm.round(2)}) mm"
-            puts "      Global end: (#{global_end.x.to_mm.round(2)}, #{global_end.y.to_mm.round(2)}, #{global_end.z.to_mm.round(2)}) mm"
-            puts "      Length: #{Math.sqrt((global_end.x - global_start.x)**2 + (global_end.y - global_start.y)**2 + (global_end.z - global_start.z)**2).to_mm.round(2)} mm"
+          puts "  -> Processing Strip light (#{instance.parent.class})"
+          
+          # Get definition bounds for correct dimensions
+          def_bounds = definition.bounds
+          
+          # Calculate start and end points in definition coordinates
+          width = def_bounds.width
+          height = def_bounds.height
+          depth = def_bounds.depth
+          
+          # Find the longest dimension
+          if width >= height && width >= depth
+            # Light extends along X axis
+            start_point = Geom::Point3d.new(def_bounds.min.x, def_bounds.center.y, def_bounds.center.z)
+            end_point = Geom::Point3d.new(def_bounds.max.x, def_bounds.center.y, def_bounds.center.z)
+          elsif height >= width && height >= depth
+            # Light extends along Y axis
+            start_point = Geom::Point3d.new(def_bounds.center.x, def_bounds.min.y, def_bounds.center.z)
+            end_point = Geom::Point3d.new(def_bounds.center.x, def_bounds.max.y, def_bounds.center.z)
+          else
+            # Light extends along Z axis
+            start_point = Geom::Point3d.new(def_bounds.center.x, def_bounds.center.y, def_bounds.min.z)
+            end_point = Geom::Point3d.new(def_bounds.center.x, def_bounds.center.y, def_bounds.max.z)
           end
+          
+          # Transform to global coordinates using accumulated transformation
+          global_start = global_trans * start_point
+          global_end = global_trans * end_point
+          
+          puts "    Global transformation applied"
+          puts "    Definition start: (#{start_point.x.to_mm.round(2)}, #{start_point.y.to_mm.round(2)}, #{start_point.z.to_mm.round(2)}) mm"
+          puts "    Global start: (#{global_start.x.to_mm.round(2)}, #{global_start.y.to_mm.round(2)}, #{global_start.z.to_mm.round(2)}) mm"
+          
+          linear_lights << {
+            type: "linear",
+            x1: global_start.x.to_mm,
+            y1: global_start.y.to_mm,
+            z1: global_start.z.to_mm,
+            x2: global_end.x.to_mm,
+            y2: global_end.y.to_mm,
+            z2: global_end.z.to_mm,
+            name: instance.name.empty? ? "LinearLight_#{linear_lights.length + 1}" : instance.name
+          }
           
         elsif definition.name.downcase.include?("sw")
           # Switch component
-          puts "  -> Processing #{definition.instances.length} Switch instances"
+          puts "  -> Processing Switch (#{instance.parent.class})"
           
-          definition.instances.each_with_index do |instance, idx|
-            # Get transformation origin (insertion point) - 점조명과 동일한 방식 사용
-            insertion_point = instance.transformation.origin
-            
-            # Get the center point of the component bounds
-            bounds = instance.bounds
-            center = bounds.center
-            
-            # Transform to global coordinates
-            global_center = instance.transformation * center
-            
-            puts "    Switch #{idx + 1}:"
-            puts "      Insertion point: (#{insertion_point.x.to_mm.round(2)}, #{insertion_point.y.to_mm.round(2)}, #{insertion_point.z.to_mm.round(2)}) mm"
-            puts "      Bounds center: (#{center.x.to_mm.round(2)}, #{center.y.to_mm.round(2)}, #{center.z.to_mm.round(2)}) mm"
-            puts "      Global center: (#{global_center.x.to_mm.round(2)}, #{global_center.y.to_mm.round(2)}, #{global_center.z.to_mm.round(2)}) mm"
-            
-            # Insertion point 사용 (center 계산이 이상함)
-            # 스위치는 1/2 적용하지 않음 (점조명과 다름)
-            switches << {
-              type: "switch",
-              x: insertion_point.x.to_mm,
-              y: insertion_point.y.to_mm,
-              z: insertion_point.z.to_mm,
-              name: instance.name.empty? ? "Switch_#{switches.length + 1}" : instance.name
-            }
-            
-            puts "      Saved as: (#{insertion_point.x.to_mm.round(2)}, #{insertion_point.y.to_mm.round(2)}, #{insertion_point.z.to_mm.round(2)}) mm"
-            
-            # Y 좌표가 정확히 같은지 확인
-            if idx > 0 && insertion_point.y.to_mm.round(10) != 0.0
-              puts "      WARNING: Y coordinate is not exactly 0!"
-            end
-          end
+          # Use origin (insertion point) for switches
+          global_origin = global_trans.origin
+          
+          puts "    Global transformation applied"
+          puts "    Global origin: (#{global_origin.x.to_mm.round(2)}, #{global_origin.y.to_mm.round(2)}, #{global_origin.z.to_mm.round(2)}) mm"
+          
+          # 스위치는 1/2 적용하지 않음 (점조명과 다름)
+          switches << {
+            type: "switch",
+            x: global_origin.x.to_mm,
+            y: global_origin.y.to_mm,
+            z: global_origin.z.to_mm,
+            name: instance.name.empty? ? "Switch_#{switches.length + 1}" : instance.name
+          }
         end
       end
       
@@ -277,8 +249,8 @@ module Iiiaha
       model = Sketchup.active_model
       model_name = model.title.empty? ? "untitled" : model.title.gsub(/[^a-zA-Z0-9_\-]/, '_')
       
-      # Get save location - default to circuitee folder
-      default_path = "C:/Users/user/Desktop/circuitee/"
+      # Get save location - default to desktop
+      default_path = ENV['USERPROFILE'] ? "#{ENV['USERPROFILE']}\\Desktop\\" : "C:\\Users\\#{ENV['USERNAME']}\\Desktop\\"
       default_filename = "#{model_name}_circuitee_lights.csv"
       filename = UI.savepanel("Save Lights CSV", default_path, default_filename)
       return unless filename

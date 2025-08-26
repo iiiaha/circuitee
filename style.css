@@ -507,6 +507,23 @@ body {
     background: #d32f2f;
 }
 
+.element-info-remove-circuit {
+    background: #ff9800;
+    color: white;
+    border: none;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.6rem;
+    cursor: pointer;
+    margin-top: 3px;
+    width: 100%;
+    transition: background 0.2s;
+}
+
+.element-info-remove-circuit:hover {
+    background: #f57c00;
+}
+
 .element.connecting {
     outline: 3px solid #9b59b6;
     outline-offset: 3px;
