@@ -1650,32 +1650,64 @@ function showShareModal() {
     state.isSharing = true;
     saveToURL();
     
-    const currentURL = window.location.href.split('?')[0].split('#')[0];
-    const shareURL = currentURL + '?mode=test#' + window.location.hash.substring(1);
-    
-    // URL 단축 서비스 안내
-    const urlLength = shareURL.length;
-    if (urlLength > 500) {
-        dom.shareUrl.value = shareURL;
-        // 단축 URL 안내 추가
+    // URL이 업데이트된 후 가져오기
+    setTimeout(() => {
+        const currentURL = window.location.href.split('?')[0].split('#')[0];
+        const shareURL = currentURL + '?mode=test#' + window.location.hash.substring(1);
+        
+        // URL 단축 서비스 안내
+        const urlLength = shareURL.length;
         const shortUrlHint = document.getElementById('shortUrlHint');
-        if (!shortUrlHint) {
-            const hint = document.createElement('div');
-            hint.id = 'shortUrlHint';
-            hint.style.marginTop = '10px';
-            hint.style.fontSize = '0.85rem';
-            hint.style.color = '#666';
-            hint.innerHTML = `URL이 깁니다 (${urlLength}자). <a href="https://bit.ly" target="_blank">bit.ly</a> 등에서 단축하세요.`;
-            dom.shareUrl.parentElement.appendChild(hint);
+        
+        if (urlLength > 2000) {
+            // URL이 너무 길면 평면도 없이 다시 저장
+            state.isSharing = false;
+            saveToURL();
+            
+            setTimeout(() => {
+                const newShareURL = currentURL + '?mode=test#' + window.location.hash.substring(1);
+                dom.shareUrl.value = newShareURL;
+                
+                if (!shortUrlHint) {
+                    const hint = document.createElement('div');
+                    hint.id = 'shortUrlHint';
+                    hint.style.marginTop = '10px';
+                    hint.style.fontSize = '0.85rem';
+                    hint.style.color = '#ff9800';
+                    hint.innerHTML = `⚠️ 평면도가 너무 커서 URL에서 제외되었습니다.<br>평면도를 포함하려면 프로젝트 파일(.circuitee)을 저장하여 공유하세요.`;
+                    dom.shareUrl.parentElement.appendChild(hint);
+                } else {
+                    shortUrlHint.style.color = '#ff9800';
+                    shortUrlHint.innerHTML = `⚠️ 평면도가 너무 커서 URL에서 제외되었습니다.<br>평면도를 포함하려면 프로젝트 파일(.circuitee)을 저장하여 공유하세요.`;
+                }
+            }, 10);
+        } else if (urlLength > 500) {
+            dom.shareUrl.value = shareURL;
+            if (!shortUrlHint) {
+                const hint = document.createElement('div');
+                hint.id = 'shortUrlHint';
+                hint.style.marginTop = '10px';
+                hint.style.fontSize = '0.85rem';
+                hint.style.color = '#666';
+                hint.innerHTML = `URL이 깁니다 (${urlLength}자). <a href="https://bit.ly" target="_blank">bit.ly</a> 등에서 단축하세요.`;
+                dom.shareUrl.parentElement.appendChild(hint);
+            } else {
+                shortUrlHint.style.color = '#666';
+                shortUrlHint.innerHTML = `URL이 깁니다 (${urlLength}자). <a href="https://bit.ly" target="_blank">bit.ly</a> 등에서 단축하세요.`;
+            }
+        } else {
+            dom.shareUrl.value = shareURL;
+            if (shortUrlHint) {
+                shortUrlHint.style.color = '#4caf50';
+                shortUrlHint.innerHTML = '✓ 평면도가 포함된 URL입니다.';
+            }
         }
-    } else {
-        dom.shareUrl.value = shareURL;
-    }
+        
+        // 공유 모드 해제
+        state.isSharing = false;
+    }, 10);
     
     dom.shareModal.hidden = false;
-    
-    // 공유 모드 해제
-    state.isSharing = false;
 }
 
 // URL 복사
