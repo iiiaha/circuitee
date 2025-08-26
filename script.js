@@ -1541,17 +1541,29 @@ function renderAll() {
 // URL에 저장
 function saveToURL() {
     try {
-        // 평면도를 제외한 상태만 저장 (성능 최적화)
+        // URL에 평면도 포함 여부 결정
+        const includeFloorPlan = state.isSharing || false; // 공유 시에만 평면도 포함
+        
         const stateToSave = {
             ...state,
-            floorPlan: state.floorPlan ? 'has-floorplan' : null
+            floorPlan: includeFloorPlan ? state.floorPlan : (state.floorPlan ? 'has-floorplan' : null)
         };
         
         const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(stateToSave));
-        window.history.replaceState(null, null, '#' + compressed);
         
-        // 평면도는 별도로 localStorage에 저장
-        if (state.floorPlan) {
+        // URL 길이 체크 (브라우저 제한: 약 2000자)
+        const fullURL = window.location.origin + window.location.pathname + '#' + compressed;
+        if (fullURL.length > 2000 && includeFloorPlan) {
+            console.warn('URL too long with floor plan, saving to localStorage only');
+            stateToSave.floorPlan = 'has-floorplan';
+            const compressedWithoutFloorPlan = LZString.compressToEncodedURIComponent(JSON.stringify(stateToSave));
+            window.history.replaceState(null, null, '#' + compressedWithoutFloorPlan);
+        } else {
+            window.history.replaceState(null, null, '#' + compressed);
+        }
+        
+        // 평면도는 별도로 localStorage에도 저장 (로컬 작업용)
+        if (state.floorPlan && !includeFloorPlan) {
             try {
                 localStorage.setItem('circuitee-floorplan', state.floorPlan);
             } catch (e) {
@@ -1573,12 +1585,16 @@ function loadFromURL() {
                 const loadedState = JSON.parse(decompressed);
                 state = { ...state, ...loadedState };
                 
-                // localStorage에서 평면도 로드
+                // 평면도 처리
                 if (loadedState.floorPlan === 'has-floorplan') {
+                    // localStorage에서 평면도 로드 (로컬 작업)
                     const savedFloorPlan = localStorage.getItem('circuitee-floorplan');
                     if (savedFloorPlan) {
                         state.floorPlan = savedFloorPlan;
                     }
+                } else if (loadedState.floorPlan && loadedState.floorPlan.startsWith('data:')) {
+                    // URL에 포함된 평면도 (공유된 링크)
+                    state.floorPlan = loadedState.floorPlan;
                 }
                 
                 // URL 파라미터로 모드 확인
@@ -1619,10 +1635,36 @@ function updateUI() {
 
 // 공유 모달 표시
 function showShareModal() {
+    // 평면도를 포함한 URL 생성
+    state.isSharing = true;
+    saveToURL();
+    
     const currentURL = window.location.href.split('?')[0].split('#')[0];
     const shareURL = currentURL + '?mode=test#' + window.location.hash.substring(1);
-    dom.shareUrl.value = shareURL;
+    
+    // URL 단축 서비스 안내
+    const urlLength = shareURL.length;
+    if (urlLength > 500) {
+        dom.shareUrl.value = shareURL;
+        // 단축 URL 안내 추가
+        const shortUrlHint = document.getElementById('shortUrlHint');
+        if (!shortUrlHint) {
+            const hint = document.createElement('div');
+            hint.id = 'shortUrlHint';
+            hint.style.marginTop = '10px';
+            hint.style.fontSize = '0.85rem';
+            hint.style.color = '#666';
+            hint.innerHTML = `URL이 깁니다 (${urlLength}자). <a href="https://bit.ly" target="_blank">bit.ly</a> 등에서 단축하세요.`;
+            dom.shareUrl.parentElement.appendChild(hint);
+        }
+    } else {
+        dom.shareUrl.value = shareURL;
+    }
+    
     dom.shareModal.hidden = false;
+    
+    // 공유 모드 해제
+    state.isSharing = false;
 }
 
 // URL 복사
