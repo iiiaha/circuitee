@@ -179,8 +179,8 @@ function processImageFile(file) {
     reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
-            // 이미지 크기 조정 (최대 1200px)
-            const maxSize = 1200;
+            // 이미지 크기 조정 (최대 800px로 줄여서 용량 감소)
+            const maxSize = 800;
             let width = img.width;
             let height = img.height;
             
@@ -201,8 +201,8 @@ function processImageFile(file) {
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
             
-            // JPEG로 압축 (품질 0.8)
-            state.floorPlan = canvas.toDataURL('image/jpeg', 0.8);
+            // JPEG로 압축 (품질 0.5로 낮춰서 용량 감소)
+            state.floorPlan = canvas.toDataURL('image/jpeg', 0.5);
             displayFloorPlan();
             saveState('평면도 업로드');
             saveToURL();
