@@ -81,6 +81,11 @@ function initDOM() {
     dom.loadProjectBtn = document.getElementById('loadProjectBtn');
     dom.projectFileInput = document.getElementById('projectFileInput');
     dom.urlBtn = document.getElementById('urlBtn');
+    
+    // 디버깅: urlBtn 확인
+    if (!dom.urlBtn) {
+        console.error('urlBtn element not found!');
+    }
 }
 
 // 이벤트 리스너 설정
@@ -90,7 +95,12 @@ function setupEventListeners() {
     dom.fileInput.addEventListener('change', handleFileUpload);
     
     // URL로 평면도 불러오기
-    dom.urlBtn.addEventListener('click', handleUrlUpload);
+    if (dom.urlBtn) {
+        dom.urlBtn.addEventListener('click', handleUrlUpload);
+        console.log('URL button event listener added');
+    } else {
+        console.error('Cannot add event listener - urlBtn is null');
+    }
     
     // CSV 업로드
     dom.csvUploadBtn.addEventListener('click', () => dom.csvInput.click());
@@ -233,6 +243,7 @@ function displayFloorPlan() {
 
 // URL로 평면도 불러오기
 function handleUrlUpload() {
+    console.log('handleUrlUpload called');
     const url = prompt('GitHub에 업로드한 평면도 이미지 URL을 입력하세요.\n예: https://raw.githubusercontent.com/iiiaha/circuitee/master/images/floorplans/floor.jpg');
     
     if (!url) return;
