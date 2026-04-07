@@ -209,15 +209,10 @@
         viewY = dragViewY + dy;
         drawAll();
       } else if (e.touches.length === 2) {
-        // 핀치 줌
+        // 핀치 줌만
         var d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
         viewScale = Math.max(0.3, Math.min(5, viewScale * (d / lastTouchDist)));
         lastTouchDist = d;
-        // 두 손가락 팬
-        var midX = (e.touches[0].clientX+e.touches[1].clientX)/2;
-        var midY = (e.touches[0].clientY+e.touches[1].clientY)/2;
-        viewX = dragViewX + (midX - dragStartX);
-        viewY = dragViewY + (midY - dragStartY);
         calcImgRect(); drawAll();
       }
     }, {passive:false});
