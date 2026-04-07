@@ -1,203 +1,392 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Circuitee - 조명 회로 설계 시뮬레이터</title>
-    <link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Circuitee</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+       background:#f8f8f8;color:#1a1a1a;display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+  .navbar{height:48px;background:#fff;border-bottom:1px solid #e5e5e5;display:flex;align-items:center;
+          justify-content:space-between;padding:0 20px;flex-shrink:0;}
+  .nav-left{display:flex;align-items:center;gap:12px;}
+  .nav-logo{font-size:15px;font-weight:700;color:#1a1a1a;letter-spacing:-0.3px;}
+  .nav-divider{width:1px;height:16px;background:#e0e0e0;}
+  .nav-project{font-size:13px;color:#999;font-weight:400;}
+  .main{flex:1;display:flex;overflow:hidden;}
+  .viewer{flex:1;position:relative;overflow:hidden;background:#f0f0f0;touch-action:none;}
+  .viewer canvas{position:absolute;top:0;left:0;width:100%;height:100%;}
+  .zoom-btns{position:absolute;top:10px;left:10px;z-index:10;display:flex;flex-direction:column;gap:2px;}
+  .zoom-btn{width:28px;height:28px;background:rgba(255,255,255,0.9);border:1px solid #ddd;
+            cursor:pointer;font-size:16px;color:#555;display:flex;align-items:center;justify-content:center;
+            border-radius:2px;transition:background 0.15s;}
+  .zoom-btn:hover{background:#fff;border-color:#aaa;}
+  .sidebar{width:220px;background:#fff;border-left:1px solid #e5e5e5;display:flex;flex-direction:column;
+           overflow:hidden;flex-shrink:0;}
+  .sidebar-header{padding:16px 16px 12px;border-bottom:1px solid #f0f0f0;}
+  .sidebar-title{font-size:11px;font-weight:600;color:#aaa;text-transform:uppercase;letter-spacing:0.5px;}
+  .sidebar-body{flex:1;overflow-y:auto;}
+  .sidebar-body::-webkit-scrollbar{width:3px;}
+  .sidebar-body::-webkit-scrollbar-thumb{background:#ddd;border-radius:2px;}
+  .sw-section{border-bottom:1px solid #f0f0f0;}
+  .sw-header{padding:10px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:background 0.15s;}
+  .sw-header:hover{background:#fafafa;}
+  .sw-name{font-size:13px;font-weight:600;color:#1a1a1a;}
+  .sw-badge{font-size:10px;color:#aaa;background:#f5f5f5;padding:2px 8px;border-radius:10px;transition:all 0.2s;}
+  .sw-badge.on{background:#fffbe6;color:#b8860b;}
+  .wire-item{padding:8px 16px 8px 28px;display:flex;align-items:center;gap:8px;cursor:pointer;transition:background 0.15s;}
+  .wire-item:hover{background:#fafafa;}
+  .wire-item.active{background:#fffdf0;}
+  .wire-dot{width:7px;height:7px;border-radius:50%;border:1.5px solid #ccc;transition:all 0.2s;flex-shrink:0;}
+  .wire-dot.on{background:#f0c040;border-color:#e0a800;box-shadow:0 0 6px rgba(240,192,64,0.5);}
+  .wire-label{flex:1;font-size:12px;color:#555;}
+  .wire-status{font-size:10px;color:#ccc;font-weight:500;min-width:24px;text-align:right;transition:color 0.2s;}
+  .wire-status.on{color:#c8960a;}
+  .sidebar-footer{margin-top:auto;padding:10px 16px;border-top:1px solid #f0f0f0;text-align:center;}
+  .sidebar-footer a{font-size:10px;color:#bbb;text-decoration:none;transition:color 0.15s;}
+  .sidebar-footer a:hover{color:#888;}
+  .loading{display:flex;align-items:center;justify-content:center;height:100vh;font-size:14px;color:#999;}
+  .expired{display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:8px;}
+  .expired h2{font-size:16px;color:#333;}
+  .expired p{font-size:13px;color:#999;}
+  @media (max-width:640px){
+    .navbar{height:40px;padding:0 12px;}
+    .nav-logo{font-size:13px;}
+    .nav-project{font-size:11px;}
+    .main{flex-direction:column;}
+    .sidebar{width:100%;max-height:35vh;border-left:none;border-top:1px solid #e5e5e5;}
+    .sidebar-header{padding:10px 12px 8px;}
+    .sw-header{padding:8px 12px;}
+    .wire-item{padding:6px 12px 6px 24px;}
+    .zoom-btns{top:6px;left:6px;}
+    .zoom-btn{width:32px;height:32px;font-size:18px;}
+  }
+</style>
 </head>
 <body>
-    <!-- 헤더 -->
-    <header class="header-modern">
-        <div class="header-logo">
-            <img src="logoname.JPG" alt="Circuitee" class="logo-name-img">
-        </div>
-        <div class="header-controls">
-            <button id="modeToggle" class="header-btn header-btn-test">
-                <svg class="header-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                    <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
-                </svg>
-                <span id="modeText">회로 테스트</span>
-            </button>
-            <button id="saveProjectBtn" class="header-btn">
-                <svg class="header-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
-                    <polyline points="17 21 17 13 7 13 7 21"/>
-                    <polyline points="7 3 7 8 15 8"/>
-                </svg>
-                <span>저장</span>
-            </button>
-            <button id="loadProjectBtn" class="header-btn">
-                <svg class="header-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M3 13V5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2v-2"/>
-                    <polyline points="7 10 12 15 17 10"/>
-                    <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-                <span>불러오기</span>
-            </button>
-            <input type="file" id="projectFileInput" accept=".circuitee" hidden>
-            <button id="shareBtn" class="header-btn header-btn-primary">
-                <svg class="header-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="18" cy="5" r="3"/>
-                    <circle cx="6" cy="12" r="3"/>
-                    <circle cx="18" cy="19" r="3"/>
-                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-                </svg>
-                <span>공유하기</span>
-            </button>
-        </div>
-    </header>
-
-    <!-- 메인 컨테이너 -->
-    <div class="main-container">
-        <!-- 사이드바 (편집 모드용) -->
-        <aside id="sidebar" class="sidebar">
-            <div class="sidebar-header">
-                <h3>편집 도구</h3>
-            </div>
-            
-            <div class="sidebar-content">
-                <!-- 평면도 섹션 -->
-                <div class="tool-group">
-                    <button id="uploadBtn" class="tool-btn-modern">
-                        <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="7 10 12 15 17 10"/>
-                            <line x1="12" y1="15" x2="12" y2="3"/>
-                        </svg>
-                        <span>평면도 불러오기</span>
-                    </button>
-                    <button id="urlBtn" class="tool-btn-modern">
-                        <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                        </svg>
-                        <span>평면도 URL</span>
-                    </button>
-                    <button id="csvUploadBtn" class="tool-btn-modern">
-                        <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                            <polyline points="14 2 14 8 20 8"/>
-                            <line x1="16" y1="13" x2="8" y2="13"/>
-                            <line x1="16" y1="17" x2="8" y2="17"/>
-                            <line x1="10" y1="9" x2="8" y2="9"/>
-                        </svg>
-                        <span>조명 불러오기</span>
-                    </button>
-                    <input type="file" id="fileInput" accept="image/*" hidden>
-                    <input type="file" id="csvInput" accept=".csv" hidden>
-                </div>
-                
-                <!-- 요소 도구 섹션 -->
-                <div class="tool-group">
-                    <div class="tool-group-label">요소 추가</div>
-                    <button class="tool-btn-modern" data-tool="switch">
-                        <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="8" width="18" height="8" rx="2"/>
-                            <circle cx="7" cy="12" r="2"/>
-                        </svg>
-                        <span>스위치</span>
-                    </button>
-                    <button class="tool-btn-modern" data-tool="light">
-                        <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="5"/>
-                            <line x1="12" y1="1" x2="12" y2="3"/>
-                            <line x1="12" y1="21" x2="12" y2="23"/>
-                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                            <line x1="1" y1="12" x2="3" y2="12"/>
-                            <line x1="21" y1="12" x2="23" y2="12"/>
-                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-                        </svg>
-                        <span>조명</span>
-                    </button>
-                    <button class="tool-btn-modern" data-tool="linear-light">
-                        <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="5" y1="12" x2="19" y2="12" stroke-width="3"/>
-                            <line x1="5" y1="8" x2="5" y2="16"/>
-                            <line x1="19" y1="8" x2="19" y2="16"/>
-                        </svg>
-                        <span>라인 조명</span>
-                    </button>
-                </div>
-                
-                <!-- 연결 도구 섹션 -->
-                <div class="tool-group">
-                    <button id="connectBtn" class="tool-btn-modern">
-                        <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                            <polyline points="15 3 21 3 21 9"/>
-                            <line x1="10" y1="14" x2="21" y2="3"/>
-                        </svg>
-                        <span>연결 모드</span>
-                    </button>
-                </div>
-                
-                <!-- 액션 섹션 -->
-                <div class="tool-group">
-                    <div class="tool-group-label">편집</div>
-                    <div class="undo-redo-container">
-                        <button id="undoBtn" class="undo-redo-btn" disabled>
-                            <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M3 7v6h6"/>
-                                <path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/>
-                            </svg>
-                        </button>
-                        <button id="redoBtn" class="undo-redo-btn" disabled>
-                            <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 7v6h-6"/>
-                                <path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- 액션 섹션 -->
-                <div class="tool-group tool-group-bottom">
-                    <button id="clearBtn" class="tool-btn-modern tool-btn-danger">
-                        <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="3 6 5 6 21 6"/>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                        </svg>
-                        <span>모두 지우기</span>
-                    </button>
-                </div>
-            </div>
-        </aside>
-
-        <!-- 캔버스 영역 -->
-        <main class="canvas-container">
-            <div id="canvas" class="canvas">
-                <div id="floorPlanLayer" class="layer floor-plan-layer">
-                    <!-- 평면도 이미지가 여기에 표시됨 -->
-                </div>
-                <div id="connectionLayer" class="layer connection-layer">
-                    <!-- 연결선이 여기에 그려짐 -->
-                </div>
-                <div id="elementLayer" class="layer element-layer">
-                    <!-- 스위치와 조명 요소들이 여기에 추가됨 -->
-                </div>
-            </div>
-        </main>
+  <div id="loadingView" class="loading">Loading...</div>
+  <div id="expiredView" class="expired" style="display:none;">
+    <h2>This link has expired</h2>
+    <p>Circuitee simulation links expire after 3 days.</p>
+  </div>
+  <div id="appView" style="display:none;">
+    <div class="navbar">
+      <div class="nav-left">
+        <span class="nav-logo">Circuitee</span>
+        <span class="nav-divider"></span>
+        <span class="nav-project">Lighting simulation</span>
+      </div>
     </div>
-
-    <!-- 공유 모달 -->
-    <div id="shareModal" class="modal" hidden>
-        <div class="modal-content">
-            <h3>프로젝트 공유</h3>
-            <p>아래 링크를 복사하여 고객에게 전달하세요:</p>
-            <div class="url-container">
-                <input type="text" id="shareUrl" readonly>
-                <button id="copyBtn" class="btn">복사</button>
-            </div>
-            <button id="closeModal" class="btn">닫기</button>
+    <div class="main">
+      <div class="viewer" id="viewer">
+        <canvas id="glowCanvas"></canvas>
+        <div class="zoom-btns">
+          <button class="zoom-btn" onclick="zoom(1)">+</button>
+          <button class="zoom-btn" onclick="zoom(-1)">&minus;</button>
+          <button class="zoom-btn" onclick="zoom(0)" style="font-size:11px;">Fit</button>
         </div>
+      </div>
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-title">Switches</div>
+        </div>
+        <div class="sidebar-body" id="switchList"></div>
+        <div class="sidebar-footer">
+          <a href="https://iiiahalab.com" target="_blank">Powered by iiiaha.lab</a>
+        </div>
+      </div>
     </div>
+  </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
-    <script src="script.js"></script>
+<script>
+  var SUPABASE_URL = 'https://rlbucymmgwqweqvlnqcq.supabase.co';
+  var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJsYnVjeW1tZ3dxd2VxdmxucWNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1NDcyNTcsImV4cCI6MjA5MTEyMzI1N30.Ea1ds3YmKVTuKCtjlKjNeq9ieTHVWGvwPf4iVuGY7jM';
+
+  var GLOW_COLOR = 'rgba(255,255,180,0.13)';
+  var switches, switchCycle = {}, canvas, ctx, bgImg, imgRect = {};
+  var hoveredSid = null, dpiX = 1, dpiY = 1;
+  var animFrame, fadingSid, prevWire = 0, crossT = 1;
+  var viewScale = 1, viewX = 0, viewY = 0;
+  var isDragging = false, dragStartX, dragStartY, dragViewX, dragViewY;
+  var lastTouchDist = 0;
+
+  // ── 데이터 로드 ──
+  async function loadData() {
+    var params = new URLSearchParams(window.location.search);
+    var id = params.get('id');
+    if (!id) { showExpired(); return; }
+
+    try {
+      var res = await fetch(SUPABASE_URL + '/rest/v1/circuitee_shares?id=eq.' + id + '&select=*', {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+      });
+      var rows = await res.json();
+      if (!rows || rows.length === 0) { showExpired(); return; }
+
+      var row = rows[0];
+      if (new Date(row.expires_at) < new Date()) { showExpired(); return; }
+
+      switches = row.data.switches || {};
+      dpiX = row.data.dpi_x || 1;
+      dpiY = row.data.dpi_y || 1;
+
+      document.getElementById('loadingView').style.display = 'none';
+      document.getElementById('appView').style.display = 'flex';
+
+      bgImg = new Image();
+      bgImg.crossOrigin = 'anonymous';
+      bgImg.onload = function() { initApp(); };
+      bgImg.src = row.image_url;
+    } catch(e) {
+      console.error(e);
+      showExpired();
+    }
+  }
+
+  function showExpired() {
+    document.getElementById('loadingView').style.display = 'none';
+    document.getElementById('expiredView').style.display = 'flex';
+  }
+
+  // ── 앱 초기화 ──
+  function initApp() {
+    canvas = document.getElementById('glowCanvas');
+    var viewer = document.getElementById('viewer');
+    updateCanvasSize();
+    renderSidebar();
+    drawAll();
+
+    if (typeof ResizeObserver !== 'undefined')
+      new ResizeObserver(function(){ updateCanvasSize(); drawAll(); }).observe(viewer);
+    window.addEventListener('resize', function(){ updateCanvasSize(); drawAll(); });
+
+    // 마우스
+    viewer.addEventListener('mousedown', function(e) {
+      if (e.target.closest('.zoom-btns')) return;
+      isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY;
+      dragViewX = viewX; dragViewY = viewY; viewer.style.cursor = 'grabbing';
+    });
+    window.addEventListener('mousemove', function(e) {
+      if (!isDragging) return;
+      viewX = dragViewX + (e.clientX - dragStartX);
+      viewY = dragViewY + (e.clientY - dragStartY);
+      drawAll();
+    });
+    window.addEventListener('mouseup', function() { isDragging = false; viewer.style.cursor = ''; });
+    viewer.addEventListener('wheel', function(e) { e.preventDefault(); zoom(e.deltaY > 0 ? -1 : 1); }, {passive:false});
+
+    // 터치
+    viewer.addEventListener('touchstart', function(e) {
+      if (e.touches.length === 1) {
+        isDragging = true; dragStartX = e.touches[0].clientX; dragStartY = e.touches[0].clientY;
+        dragViewX = viewX; dragViewY = viewY;
+      } else if (e.touches.length === 2) {
+        isDragging = false;
+        lastTouchDist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+      }
+    }, {passive:false});
+    viewer.addEventListener('touchmove', function(e) {
+      e.preventDefault();
+      if (e.touches.length === 1 && isDragging) {
+        viewX = dragViewX + (e.touches[0].clientX - dragStartX);
+        viewY = dragViewY + (e.touches[0].clientY - dragStartY);
+        drawAll();
+      } else if (e.touches.length === 2) {
+        var d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+        viewScale = Math.max(0.3, Math.min(5, viewScale * (d / lastTouchDist)));
+        lastTouchDist = d; drawAll();
+      }
+    }, {passive:false});
+    viewer.addEventListener('touchend', function() { isDragging = false; });
+
+    canvas.addEventListener('click', onCanvasClick);
+  }
+
+  function updateCanvasSize() {
+    var viewer = document.getElementById('viewer');
+    canvas.width = viewer.clientWidth; canvas.height = viewer.clientHeight;
+    ctx = canvas.getContext('2d'); calcImgRect();
+  }
+
+  function calcImgRect() {
+    var vw = canvas.width, vh = canvas.height;
+    var iw = bgImg.naturalWidth, ih = bgImg.naturalHeight;
+    var s = Math.min(vw/iw, vh/ih) * viewScale;
+    var dw = iw*s, dh = ih*s;
+    imgRect = { x: vw/2+viewX-dw/2, y: vh/2+viewY-dh/2, w:dw, h:dh, origW:iw, origH:ih };
+  }
+
+  function toCanvasXY(sx, sy) {
+    return { x: imgRect.x+(sx*dpiX/imgRect.origW)*imgRect.w, y: imgRect.y+(sy*dpiY/imgRect.origH)*imgRect.h };
+  }
+
+  function getSwRadius(sw) { return Math.max((sw.sw_radius||20)*(imgRect.w/imgRect.origW), 16); }
+
+  function zoom(dir) {
+    if (dir===0) { viewScale=1; viewX=0; viewY=0; }
+    else { viewScale = Math.max(0.3, Math.min(5, viewScale + dir*0.2)); }
+    calcImgRect(); drawAll();
+  }
+
+  // ── 인터랙션 ──
+  function onCanvasClick(e) {
+    if (isDragging) return;
+    var r = canvas.getBoundingClientRect(), mx = e.clientX-r.left, my = e.clientY-r.top;
+    for (var sid in switches) {
+      var sw = switches[sid]; if (sw.x===undefined) continue;
+      var p = toCanvasXY(sw.x,sw.y), rad = getSwRadius(sw);
+      if ((mx-p.x)*(mx-p.x)+(my-p.y)*(my-p.y) <= rad*rad) { cycleSwitch(sid); return; }
+    }
+  }
+
+  function cycleSwitch(sid) {
+    prevWire = switchCycle[sid]||0; fadingSid = sid;
+    var wk = Object.keys(switches[sid].wires).sort(function(a,b){return a-b;});
+    switchCycle[sid] = ((switchCycle[sid]||0)+1) % (wk.length+1);
+    renderSidebar(); startCrossfade();
+  }
+
+  function toggleWireFromSidebar(sid, wi) {
+    prevWire = switchCycle[sid]||0; fadingSid = sid;
+    var wk = Object.keys(switches[sid].wires).sort(function(a,b){return a-b;});
+    var idx = wk.indexOf(String(wi));
+    switchCycle[sid] = ((switchCycle[sid]||0)===idx+1) ? 0 : idx+1;
+    renderSidebar(); startCrossfade();
+  }
+
+  // ── 크로스페이드 ──
+  function startCrossfade() { if (animFrame) cancelAnimationFrame(animFrame); crossT=0; crossStep(); }
+  function crossStep() {
+    crossT += 0.08;
+    if (crossT>=1) { crossT=1; fadingSid=null; drawAll(); return; }
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(bgImg, imgRect.x, imgRect.y, imgRect.w, imgRect.h);
+    drawSwitchCircles();
+    for (var sid in switches) {
+      if (sid===fadingSid) {
+        ctx.globalAlpha=1-crossT; drawGlows(sid,prevWire);
+        ctx.globalAlpha=crossT; drawGlows(sid,switchCycle[sid]||0);
+        ctx.globalAlpha=1;
+      } else { drawGlows(sid,switchCycle[sid]||0); }
+    }
+    animFrame = requestAnimationFrame(crossStep);
+  }
+
+  function drawGlows(sid, cycle) {
+    if (!cycle) return;
+    var wk = Object.keys(switches[sid].wires).sort(function(a,b){return a-b;});
+    var wi = wk[cycle-1]; if (!wi) return;
+    var lts = switches[sid].wires[wi].lights;
+    for (var j=0;j<lts.length;j++) drawShape(lts[j]);
+  }
+
+  // ── 사이드바 ──
+  function renderSidebar() {
+    var el = document.getElementById('switchList'), html = '';
+    for (var sid in switches) {
+      var sw = switches[sid];
+      var wk = Object.keys(sw.wires).sort(function(a,b){return a-b;});
+      var cycle = switchCycle[sid]||0;
+      var anyOn = cycle > 0;
+      var badgeText = !anyOn ? 'OFF' : 'C'+((sw.wires[wk[cycle-1]]||{}).circuit_num||(cycle));
+      html += '<div class="sw-section">';
+      html += '<div class="sw-header" onclick="cycleSwitch(\''+sid+'\')">';
+      html += '<span class="sw-name">'+sw.name+'</span>';
+      html += '<span class="sw-badge'+(anyOn?' on':'')+'">'+badgeText+'</span></div>';
+      for (var i=0;i<wk.length;i++) {
+        var wi=wk[i], w=sw.wires[wi], isOn=(cycle===i+1);
+        var cNum = w.circuit_num ? 'C'+w.circuit_num : 'C'+(i+1);
+        var wName = w.wire_name ? ' '+w.wire_name : '';
+        html += '<div class="wire-item'+(isOn?' active':'')+'" onclick="toggleWireFromSidebar(\''+sid+'\','+wi+')">';
+        html += '<span class="wire-dot'+(isOn?' on':'')+'"></span>';
+        html += '<span class="wire-label">'+cNum+wName+'</span>';
+        html += '<span class="wire-status'+(isOn?' on':'')+'">'+(isOn?'ON':'OFF')+'</span></div>';
+      }
+      html += '</div>';
+    }
+    el.innerHTML = html;
+  }
+
+  // ── 드로잉 ──
+  function drawAll() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(bgImg, imgRect.x, imgRect.y, imgRect.w, imgRect.h);
+    drawSwitchCircles();
+    for (var sid in switches) drawGlows(sid,switchCycle[sid]||0);
+  }
+
+  function drawSwitchCircles() {
+    for (var sid in switches) {
+      var sw=switches[sid]; if (sw.x===undefined) continue;
+      var p=toCanvasXY(sw.x,sw.y), r=getSwRadius(sw);
+      var cycle=switchCycle[sid]||0, isHover=(hoveredSid===sid);
+      ctx.font = 'bold '+Math.max(Math.round(r*0.55),9)+'px "Pretendard Variable",sans-serif';
+      var tm = ctx.measureText(sw.name);
+      var tw = tm.width+10, th = Math.round(r*0.55)+8;
+      ctx.fillStyle = cycle>0 ? 'rgba(255,248,220,0.85)' : 'rgba(255,255,255,0.75)';
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(p.x-tw/2,p.y-th/2,tw,th,3);
+      else ctx.rect(p.x-tw/2,p.y-th/2,tw,th);
+      ctx.fill();
+      if (isHover) { ctx.strokeStyle='rgba(0,0,0,0.15)'; ctx.lineWidth=1;
+        ctx.beginPath(); if(ctx.roundRect)ctx.roundRect(p.x-tw/2,p.y-th/2,tw,th,3);else ctx.rect(p.x-tw/2,p.y-th/2,tw,th); ctx.stroke(); }
+      ctx.fillStyle = cycle>0 ? 'rgba(180,130,0,0.8)' : 'rgba(0,0,0,0.5)';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(sw.name, p.x, p.y);
+    }
+  }
+
+  function drawShape(light) {
+    var shape = light.shape || 'cone';
+    if (shape==='cone'||shape==='pyramid') {
+      if (!light.cone||light.cone.length<3) return;
+      var tip=toCanvasXY(light.x,light.y);
+      var pts=light.cone.map(function(p){return toCanvasXY(p[0],p[1]);});
+      for (var i=0;i<pts.length;i++) {
+        var n=(i+1)%pts.length;
+        ctx.beginPath();ctx.moveTo(tip.x,tip.y);ctx.lineTo(pts[i].x,pts[i].y);ctx.lineTo(pts[n].x,pts[n].y);
+        ctx.closePath();ctx.fillStyle=GLOW_COLOR;ctx.fill();
+      }
+      ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
+      for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);
+      ctx.closePath();ctx.fillStyle=GLOW_COLOR;ctx.fill();
+    } else if (shape==='frustum') {
+      if(!light.cone||!light.circle2)return;
+      var cB=light.cone.map(function(p){return toCanvasXY(p[0],p[1]);});
+      var cT=light.circle2.map(function(p){return toCanvasXY(p[0],p[1]);});
+      for(var i=0;i<cB.length;i++){var n=(i+1)%cB.length;
+        ctx.beginPath();ctx.moveTo(cT[i].x,cT[i].y);ctx.lineTo(cT[n].x,cT[n].y);ctx.lineTo(cB[i].x,cB[i].y);ctx.closePath();ctx.fillStyle=GLOW_COLOR;ctx.fill();
+        ctx.beginPath();ctx.moveTo(cT[n].x,cT[n].y);ctx.lineTo(cB[n].x,cB[n].y);ctx.lineTo(cB[i].x,cB[i].y);ctx.closePath();ctx.fillStyle=GLOW_COLOR;ctx.fill();
+      }
+      var tip=toCanvasXY(light.x,light.y);
+      for(var i=0;i<cT.length;i++){var n=(i+1)%cT.length;ctx.beginPath();ctx.moveTo(tip.x,tip.y);ctx.lineTo(cT[i].x,cT[i].y);ctx.lineTo(cT[n].x,cT[n].y);ctx.closePath();ctx.fillStyle=GLOW_COLOR;ctx.fill();}
+      var base=toCanvasXY(light.base[0],light.base[1]);
+      for(var i=0;i<cB.length;i++){var n=(i+1)%cB.length;ctx.beginPath();ctx.moveTo(base.x,base.y);ctx.lineTo(cB[i].x,cB[i].y);ctx.lineTo(cB[n].x,cB[n].y);ctx.closePath();ctx.fillStyle=GLOW_COLOR;ctx.fill();}
+    } else if (shape==='sphere') {
+      if(!light.cone||light.cone.length<3)return;
+      var pts=light.cone.map(function(p){return toCanvasXY(p[0],p[1]);});
+      var segs=light.segments||8,rings=light.rings||6;
+      for(var r=0;r<rings;r++){for(var s=0;s<segs;s++){
+        var i1=r*segs+s,i2=r*segs+(s+1)%segs,i3=(r+1)*segs+s,i4=(r+1)*segs+(s+1)%segs;
+        if(i3>=pts.length||i4>=pts.length)continue;
+        ctx.beginPath();ctx.moveTo(pts[i1].x,pts[i1].y);ctx.lineTo(pts[i2].x,pts[i2].y);ctx.lineTo(pts[i3].x,pts[i3].y);ctx.closePath();ctx.fillStyle=GLOW_COLOR;ctx.fill();
+        ctx.beginPath();ctx.moveTo(pts[i2].x,pts[i2].y);ctx.lineTo(pts[i4].x,pts[i4].y);ctx.lineTo(pts[i3].x,pts[i3].y);ctx.closePath();ctx.fillStyle=GLOW_COLOR;ctx.fill();
+      }}
+    } else if (shape==='cylinder') {
+      if(!light.cone||!light.circle2)return;
+      var c1=light.cone.map(function(p){return toCanvasXY(p[0],p[1]);});
+      var c2=light.circle2.map(function(p){return toCanvasXY(p[0],p[1]);});
+      for(var i=0;i<c1.length;i++){var n=(i+1)%c1.length;
+        ctx.beginPath();ctx.moveTo(c1[i].x,c1[i].y);ctx.lineTo(c1[n].x,c1[n].y);ctx.lineTo(c2[i].x,c2[i].y);ctx.closePath();ctx.fillStyle=GLOW_COLOR;ctx.fill();
+        ctx.beginPath();ctx.moveTo(c1[n].x,c1[n].y);ctx.lineTo(c2[n].x,c2[n].y);ctx.lineTo(c2[i].x,c2[i].y);ctx.closePath();ctx.fillStyle=GLOW_COLOR;ctx.fill();
+      }
+    }
+  }
+
+  loadData();
+</script>
 </body>
 </html>
