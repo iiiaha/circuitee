@@ -52,17 +52,22 @@
   .expired{display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:8px;}
   .expired h2{font-size:16px;color:#333;}
   .expired p{font-size:13px;color:#999;}
-  @media (max-width:640px){
+  @media (max-width:768px){
     .navbar{height:40px;padding:0 12px;}
     .nav-logo{font-size:13px;}
-    .nav-project{font-size:11px;}
+    .nav-project{display:none;}
+    .nav-divider{display:none;}
     .main{flex-direction:column;}
-    .sidebar{width:100%;max-height:35vh;border-left:none;border-top:1px solid #e5e5e5;}
+    .viewer{min-height:50vh;flex:none;height:60vh;}
+    .sidebar{width:100%;flex:1;min-height:0;max-height:none;border-left:none;border-top:1px solid #e5e5e5;
+             overflow-y:auto;}
     .sidebar-header{padding:10px 12px 8px;}
     .sw-header{padding:8px 12px;}
-    .wire-item{padding:6px 12px 6px 24px;}
+    .wire-item{padding:6px 12px 6px 20px;gap:6px;}
+    .wire-label{font-size:11px;}
     .zoom-btns{top:6px;left:6px;}
-    .zoom-btn{width:32px;height:32px;font-size:18px;}
+    .zoom-btn{width:34px;height:34px;font-size:20px;}
+    .sidebar-footer{padding:6px 12px;}
   }
 </style>
 </head>
@@ -72,7 +77,7 @@
     <h2>This link has expired</h2>
     <p>Circuitee simulation links expire after 3 days.</p>
   </div>
-  <div id="appView" style="display:none;">
+  <div id="appView" style="display:none;flex-direction:column;height:100vh;overflow:hidden;">
     <div class="navbar">
       <div class="nav-left">
         <span class="nav-logo">Circuitee</span>
@@ -134,7 +139,8 @@
       dpiY = row.data.dpi_y || 1;
 
       document.getElementById('loadingView').style.display = 'none';
-      document.getElementById('appView').style.display = 'flex';
+      var app = document.getElementById('appView');
+      app.style.display = 'flex';
 
       bgImg = new Image();
       bgImg.crossOrigin = 'anonymous';
