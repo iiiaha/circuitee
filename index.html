@@ -66,8 +66,10 @@
              transform:translateY(calc(100% - 36px));transition:transform 0.25s ease;z-index:20;}
     .sidebar.open{transform:translateY(0);}
     .sidebar-header{padding:8px 12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;}
-    .sidebar-toggle{font-size:16px;color:#aaa;transition:transform 0.25s;}
-    .sidebar.open .sidebar-toggle{transform:rotate(180deg);}
+    .sidebar-toggle{width:20px;height:4px;position:relative;display:inline-block;}
+    .sidebar-toggle::before{content:'';position:absolute;left:3px;top:0;width:7px;height:7px;
+      border-left:1.5px solid #bbb;border-top:1.5px solid #bbb;transform:rotate(45deg);}
+    .sidebar.open .sidebar-toggle::before{transform:rotate(225deg);}
     .sw-header{padding:8px 12px;}
     .wire-item{padding:6px 12px 6px 20px;gap:6px;}
     .wire-label{font-size:11px;}
@@ -103,7 +105,7 @@
       <div class="sidebar">
         <div class="sidebar-header" onclick="toggleSidebar()">
           <div class="sidebar-title">Switches</div>
-          <span class="sidebar-toggle">&#9650;</span>
+          <span class="sidebar-toggle"></span>
         </div>
         <div class="sidebar-body" id="switchList"></div>
         <div class="sidebar-footer">
