@@ -186,12 +186,16 @@
 
     // 터치
     viewer.addEventListener('touchstart', function(e) {
+      e.preventDefault();
       if (e.touches.length === 1) {
         isDragging = true; dragStartX = e.touches[0].clientX; dragStartY = e.touches[0].clientY;
         dragViewX = viewX; dragViewY = viewY;
       } else if (e.touches.length === 2) {
         isDragging = false;
         lastTouchDist = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+        dragViewX = viewX; dragViewY = viewY;
+        dragStartX = (e.touches[0].clientX+e.touches[1].clientX)/2;
+        dragStartY = (e.touches[0].clientY+e.touches[1].clientY)/2;
       }
     }, {passive:false});
     viewer.addEventListener('touchmove', function(e) {
@@ -201,12 +205,27 @@
         viewY = dragViewY + (e.touches[0].clientY - dragStartY);
         drawAll();
       } else if (e.touches.length === 2) {
+        // 핀치 줌
         var d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
         viewScale = Math.max(0.3, Math.min(5, viewScale * (d / lastTouchDist)));
-        lastTouchDist = d; drawAll();
+        lastTouchDist = d;
+        // 두 손가락 팬
+        var midX = (e.touches[0].clientX+e.touches[1].clientX)/2;
+        var midY = (e.touches[0].clientY+e.touches[1].clientY)/2;
+        viewX = dragViewX + (midX - dragStartX);
+        viewY = dragViewY + (midY - dragStartY);
+        calcImgRect(); drawAll();
       }
     }, {passive:false});
-    viewer.addEventListener('touchend', function() { isDragging = false; });
+    viewer.addEventListener('touchend', function(e) {
+      isDragging = false;
+      // 남은 손가락으로 상태 리셋
+      if (e.touches.length === 1) {
+        isDragging = true;
+        dragStartX = e.touches[0].clientX; dragStartY = e.touches[0].clientY;
+        dragViewX = viewX; dragViewY = viewY;
+      }
+    });
 
     canvas.addEventListener('click', onCanvasClick);
   }
