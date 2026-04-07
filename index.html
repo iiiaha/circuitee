@@ -348,6 +348,7 @@
 
   // ── 드로잉 ──
   function drawAll() {
+    calcImgRect();
     ctx.clearRect(0,0,canvas.width,canvas.height);
     ctx.drawImage(bgImg, imgRect.x, imgRect.y, imgRect.w, imgRect.h);
     drawSwitchCircles();
