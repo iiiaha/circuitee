@@ -187,7 +187,7 @@
     // 터치
     var touchStartTime = 0, touchMoved = false;
     viewer.addEventListener('touchstart', function(e) {
-      e.preventDefault();
+      if (e.touches.length >= 2) e.preventDefault();
       if (e.touches.length === 1) {
         isDragging = true; touchMoved = false; touchStartTime = Date.now();
         dragStartX = e.touches[0].clientX; dragStartY = e.touches[0].clientY;
