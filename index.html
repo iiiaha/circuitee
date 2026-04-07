@@ -185,10 +185,12 @@
     viewer.addEventListener('wheel', function(e) { e.preventDefault(); zoom(e.deltaY > 0 ? -1 : 1); }, {passive:false});
 
     // 터치
+    var touchStartTime = 0, touchMoved = false;
     viewer.addEventListener('touchstart', function(e) {
       e.preventDefault();
       if (e.touches.length === 1) {
-        isDragging = true; dragStartX = e.touches[0].clientX; dragStartY = e.touches[0].clientY;
+        isDragging = true; touchMoved = false; touchStartTime = Date.now();
+        dragStartX = e.touches[0].clientX; dragStartY = e.touches[0].clientY;
         dragViewX = viewX; dragViewY = viewY;
       } else if (e.touches.length === 2) {
         isDragging = false;
@@ -201,8 +203,10 @@
     viewer.addEventListener('touchmove', function(e) {
       e.preventDefault();
       if (e.touches.length === 1 && isDragging) {
-        viewX = dragViewX + (e.touches[0].clientX - dragStartX);
-        viewY = dragViewY + (e.touches[0].clientY - dragStartY);
+        var dx = e.touches[0].clientX - dragStartX, dy = e.touches[0].clientY - dragStartY;
+        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) touchMoved = true;
+        viewX = dragViewX + dx;
+        viewY = dragViewY + dy;
         drawAll();
       } else if (e.touches.length === 2) {
         // 핀치 줌
@@ -218,10 +222,21 @@
       }
     }, {passive:false});
     viewer.addEventListener('touchend', function(e) {
+      // 짧은 탭 (이동 없이 300ms 이내) → 스위치 클릭으로 처리
+      if (!touchMoved && Date.now() - touchStartTime < 300 && e.changedTouches.length > 0) {
+        var t = e.changedTouches[0];
+        var r = canvas.getBoundingClientRect();
+        var mx = t.clientX - r.left, my = t.clientY - r.top;
+        for (var sid in switches) {
+          var sw = switches[sid]; if (sw.x === undefined) continue;
+          var p = toCanvasXY(sw.x, sw.y), rad = getSwRadius(sw);
+          if ((mx-p.x)*(mx-p.x)+(my-p.y)*(my-p.y) <= rad*rad) { cycleSwitch(sid); break; }
+        }
+      }
       isDragging = false;
       // 남은 손가락으로 상태 리셋
       if (e.touches.length === 1) {
-        isDragging = true;
+        isDragging = true; touchMoved = false; touchStartTime = Date.now();
         dragStartX = e.touches[0].clientX; dragStartY = e.touches[0].clientY;
         dragViewX = viewX; dragViewY = viewY;
       }
