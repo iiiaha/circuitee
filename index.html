@@ -58,11 +58,16 @@
     .nav-logo{font-size:13px;}
     .nav-project{display:none;}
     .nav-divider{display:none;}
-    .main{flex-direction:column;}
-    .viewer{min-height:50vh;flex:none;height:60vh;}
-    .sidebar{width:100%;flex:1;min-height:0;max-height:none;border-left:none;border-top:1px solid #e5e5e5;
-             overflow-y:auto;}
-    .sidebar-header{padding:10px 12px 8px;}
+    .main{flex-direction:column;position:relative;}
+    .viewer{flex:1;min-height:0;}
+    .sidebar{position:absolute;bottom:0;left:0;right:0;width:100%;
+             background:#fff;border-top:1px solid #e5e5e5;
+             max-height:50vh;overflow-y:auto;
+             transform:translateY(calc(100% - 36px));transition:transform 0.25s ease;z-index:20;}
+    .sidebar.open{transform:translateY(0);}
+    .sidebar-header{padding:8px 12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;}
+    .sidebar-toggle{font-size:16px;color:#aaa;transition:transform 0.25s;}
+    .sidebar.open .sidebar-toggle{transform:rotate(180deg);}
     .sw-header{padding:8px 12px;}
     .wire-item{padding:6px 12px 6px 20px;gap:6px;}
     .wire-label{font-size:11px;}
@@ -96,8 +101,9 @@
         </div>
       </div>
       <div class="sidebar">
-        <div class="sidebar-header">
+        <div class="sidebar-header" onclick="toggleSidebar()">
           <div class="sidebar-title">Switches</div>
+          <span class="sidebar-toggle">&#9650;</span>
         </div>
         <div class="sidebar-body" id="switchList"></div>
         <div class="sidebar-footer">
@@ -347,6 +353,10 @@
   }
 
   // ── 드로잉 ──
+  function toggleSidebar() {
+    document.querySelector('.sidebar').classList.toggle('open');
+  }
+
   function drawAll() {
     calcImgRect();
     ctx.clearRect(0,0,canvas.width,canvas.height);
